@@ -21,6 +21,15 @@ Future<void> main(List<String> arguments) async {
       ArgParser()
         ..addFlag('all', abbr: 'a', negatable: false)
         ..addMultiOption('add', abbr: 'c')
+        ..addFlag('yes', abbr: 'y', negatable: false)
+        ..addOption('install-path', help: 'Install path inside lib/')
+        ..addOption('shared-path', help: 'Shared path inside lib/')
+        ..addFlag('include-readme', negatable: true)
+        ..addFlag('include-meta', negatable: true)
+        ..addFlag('include-preview', negatable: true)
+        ..addOption('prefix', help: 'Class alias prefix')
+        ..addOption('theme', help: 'Theme preset id')
+        ..addMultiOption('alias', help: 'Path alias, e.g. ui=lib/ui')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -129,21 +138,39 @@ Future<void> main(List<String> arguments) async {
         print('  --help, -h         Show this message');
         exit(0);
       }
-      await installer!.init();
+      final skipPrompts = initCommand['yes'] == true;
+      final aliasPairs = (initCommand['alias'] as List).cast<String>();
+      final aliases = _parseAliasPairs(aliasPairs);
+      await installer!.init(
+        skipPrompts: skipPrompts,
+        configOverrides: InitConfigOverrides(
+          installPath: initCommand['install-path'] as String?,
+          sharedPath: initCommand['shared-path'] as String?,
+          includeReadme: initCommand['include-readme'] as bool?,
+          includeMeta: initCommand['include-meta'] as bool?,
+          includePreview: initCommand['include-preview'] as bool?,
+          classPrefix: initCommand['prefix'] as String?,
+          pathAliases: aliases.isEmpty ? null : aliases,
+        ),
+        themePreset: initCommand['theme'] as String?,
+      );
       final addAll = initCommand['all'] == true;
-      final addList = (initCommand['add'] as List).cast<String>();
+      final addList = <String>[
+        ...(initCommand['add'] as List).cast<String>(),
+        ...initCommand.rest,
+      ];
       if (addAll) {
         for (final component in registry!.components) {
-          await installer!.addComponent(component.id);
+          await installer.addComponent(component.id);
         }
-        await installer!.generateAliases();
+        await installer.generateAliases();
         break;
       }
       if (addList.isNotEmpty) {
         for (final componentName in addList) {
-          await installer!.addComponent(componentName);
+          await installer.addComponent(componentName);
         }
-        await installer!.generateAliases();
+        await installer.generateAliases();
       }
       break;
     case 'theme':
@@ -468,6 +495,38 @@ class _RemoteRoots {
     required this.registryRoot,
     required this.sourceRoot,
   });
+}
+
+Map<String, String> _parseAliasPairs(List<String> entries) {
+  final aliases = <String, String>{};
+  for (final entry in entries) {
+    final trimmed = entry.trim();
+    if (trimmed.isEmpty) {
+      continue;
+    }
+    final parts = trimmed.split('=');
+    if (parts.length != 2) {
+      continue;
+    }
+    final key = parts.first.trim();
+    final value = parts.last.trim();
+    if (key.isEmpty || value.isEmpty) {
+      continue;
+    }
+    aliases[key] = _stripLibPrefix(value);
+  }
+  return aliases;
+}
+
+String _stripLibPrefix(String value) {
+  final normalized = p.normalize(value);
+  if (normalized == 'lib') {
+    return '';
+  }
+  if (normalized.startsWith('lib${p.separator}')) {
+    return normalized.substring('lib'.length + 1);
+  }
+  return normalized;
 }
 
 const String _defaultRemoteRegistryBase =

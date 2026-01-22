@@ -78,6 +78,46 @@ void main() {
         registryRoot.path,
       ]);
     });
+
+    test('init --add installs multiple widgets', () async {
+      await cli.main([
+        'init',
+        '--yes',
+        '--add',
+        'button',
+        'dialog',
+        '--registry',
+        'local',
+        '--registry-path',
+        registryRoot.path,
+      ]);
+
+      final buttonFile = File(
+        p.join(
+          appRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'components',
+          'button',
+          'button.dart',
+        ),
+      );
+      final dialogFile = File(
+        p.join(
+          appRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'components',
+          'dialog',
+          'dialog.dart',
+        ),
+      );
+
+      expect(buttonFile.existsSync(), isTrue);
+      expect(dialogFile.existsSync(), isTrue);
+    });
   });
 }
 
@@ -85,18 +125,53 @@ void _writeRegistryFixtures(Directory registryRoot) {
   final root = p.dirname(registryRoot.path);
   final componentsDir = Directory(p.join(root, 'registry', 'components', 'button'))
     ..createSync(recursive: true);
+  final dialogDir = Directory(p.join(root, 'registry', 'components', 'dialog'))
+    ..createSync(recursive: true);
+  final sharedThemeDir = Directory(p.join(root, 'registry', 'shared', 'theme'))
+    ..createSync(recursive: true);
+  final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
+    ..createSync(recursive: true);
 
   File(p.join(componentsDir.path, 'button.dart'))
       .writeAsStringSync('class Button {}');
   File(p.join(componentsDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"button"}');
 
+    File(p.join(dialogDir.path, 'dialog.dart'))
+      .writeAsStringSync('class Dialog {}');
+    File(p.join(dialogDir.path, 'meta.json'))
+      .writeAsStringSync('{"id":"dialog"}');
+
+    File(p.join(sharedThemeDir.path, 'theme.dart'))
+      .writeAsStringSync('class ThemeHelper {}');
+    File(p.join(sharedUtilDir.path, 'util.dart'))
+      .writeAsStringSync('class UtilHelper {}');
+
   final registryJson = {
     'defaults': {
       'installPath': 'lib/ui/shadcn',
       'sharedPath': 'lib/ui/shadcn/shared',
     },
-    'shared': [],
+    'shared': [
+      {
+        'id': 'theme',
+        'files': [
+          {
+            'source': 'registry/shared/theme/theme.dart',
+            'destination': '{sharedPath}/theme/theme.dart'
+          }
+        ]
+      },
+      {
+        'id': 'util',
+        'files': [
+          {
+            'source': 'registry/shared/util/util.dart',
+            'destination': '{sharedPath}/util/util.dart'
+          }
+        ]
+      }
+    ],
     'components': [
       {
         'id': 'button',
@@ -113,6 +188,25 @@ void _writeRegistryFixtures(Directory registryRoot) {
         ],
         'shared': [],
         'dependsOn': [],
+        'pubspec': {
+          'dependencies': {}
+        }
+      },
+      {
+        'id': 'dialog',
+        'name': 'Dialog',
+        'files': [
+          {
+            'source': 'registry/components/dialog/dialog.dart',
+            'destination': '{installPath}/components/dialog/dialog.dart'
+          },
+          {
+            'source': 'registry/components/dialog/meta.json',
+            'destination': '{installPath}/components/dialog/meta.json'
+          }
+        ],
+        'shared': [],
+        'dependsOn': ['button'],
         'pubspec': {
           'dependencies': {}
         }

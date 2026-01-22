@@ -1,85 +1,3 @@
-# flutter_shadcn_cli
-
-This tool puts ready‑made Flutter widgets into your app.
-
-Developer note: the CLI copies Dart files from the registry into your project, updates your pubspec when a widget needs extra packages, and saves your choices in .shadcn/config.json so you don’t have to repeat them.
-
-## 1) Install the tool
-
-```bash
-dart pub global activate flutter_shadcn_cli
-```
-
-Make sure this folder is in your PATH:
-
-```bash
-$HOME/.pub-cache/bin
-```
-
-## 2) Start in your app
-
-Run this inside your Flutter app folder:
-
-```bash
-flutter_shadcn init
-```
-
-You will be asked simple questions like:
-
-- Where to put files (inside lib/)
-- Which optional files to include
-
-## 3) Add a widget
-
-```bash
-flutter_shadcn add button
-```
-
-Add more than one widget:
-
-```bash
-flutter_shadcn add command dialog
-```
-
-Add every widget:
-
-```bash
-flutter_shadcn add --all
-```
-
-## One‑line setup (fast)
-
-Init and add in one command:
-
-```bash
-flutter_shadcn init --add button
-```
-
-Add multiple:
-
-```bash
-flutter_shadcn init --add button --add dialog
-```
-
-Add everything:
-
-```bash
-flutter_shadcn init --all
-```
-
-## Remove a widget
-
-```bash
-flutter_shadcn remove button
-```
-
-Force remove (even if other widgets depend on it):
-
-```bash
-flutter_shadcn remove button --force
-```
-# flutter_shadcn_cli
-
 CLI installer for the shadcn_flutter registry. It copies Widgets and shared helpers into your Flutter app from either a local registry (development) or a remote registry (production).
 
 ## Highlights
@@ -110,12 +28,32 @@ $HOME/.pub-cache/bin
 flutter_shadcn init
 ```
 
+Skip questions and use defaults:
+
+```bash
+flutter_shadcn init --yes
+```
+
 You will be asked:
 
 - Where to put files (inside lib/)
 - Which optional files to include
 - Optional alias prefix
 - Theme preset
+
+Skip questions and set everything in one command:
+
+```bash
+flutter_shadcn init --yes \
+	--install-path ui/shadcn \
+	--shared-path ui/shadcn/shared \
+	--include-meta \
+	--include-readme=false \
+	--include-preview=false \
+	--prefix App \
+	--theme new-york \
+	--alias ui=ui
+```
 
 ### 2) Add Widgets
 
@@ -152,13 +90,7 @@ flutter_shadcn remove button --force
 Init and add in one command:
 
 ```bash
-flutter_shadcn init --add button
-```
-
-Add multiple:
-
-```bash
-flutter_shadcn init --add button --add dialog
+flutter_shadcn init --add button dialog
 ```
 
 Add everything:
@@ -224,6 +156,26 @@ Saved choices per project:
 flutter_shadcn init
 ```
 
+Use defaults (no questions):
+
+```bash
+flutter_shadcn init --yes
+```
+
+Set all values in one command:
+
+```bash
+flutter_shadcn init --yes \
+	--install-path ui/shadcn \
+	--shared-path ui/shadcn/shared \
+	--include-meta \
+	--include-readme=false \
+	--include-preview=false \
+	--prefix App \
+	--theme new-york \
+	--alias ui=ui
+```
+
 ### add
 
 ```bash
@@ -253,7 +205,7 @@ flutter_shadcn doctor
 Set during init, for example:
 
 ```text
-ui=lib/ui, hooks=lib/hooks
+ui=ui
 ```
 
 Use them like:

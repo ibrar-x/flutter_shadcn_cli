@@ -378,6 +378,37 @@ void main() {
       );
       expect(buttonFile.existsSync(), isFalse);
     });
+
+    test('init with overrides normalizes paths and aliases', () async {
+      final registry = await Registry.load(
+        registryRoot: RegistryLocation.local(registryRoot.path),
+        sourceRoot: RegistryLocation.local(p.dirname(registryRoot.path)),
+      );
+
+      final installer = Installer(
+        registry: registry,
+        targetDir: targetRoot.path,
+        logger: const CliLogger(),
+      );
+
+      await installer.init(
+        skipPrompts: true,
+        configOverrides: const InitConfigOverrides(
+          installPath: 'ui/shadcn',
+          sharedPath: 'lib/ui/shadcn/shared',
+          includeReadme: false,
+          includeMeta: true,
+          includePreview: false,
+          classPrefix: 'App',
+          pathAliases: {'ui': 'lib/ui'},
+        ),
+      );
+
+      final config = await ShadcnConfig.load(targetRoot.path);
+      expect(config.installPath, 'lib/ui/shadcn');
+      expect(config.sharedPath, 'lib/ui/shadcn/shared');
+      expect(config.pathAliases?['ui'], 'ui');
+    });
   });
 }
 
@@ -386,6 +417,10 @@ void _writeRegistryFixtures(Directory registryRoot) {
   final componentsDir = Directory(p.join(root, 'registry', 'components', 'button'))
     ..createSync(recursive: true);
   final dialogDir = Directory(p.join(root, 'registry', 'components', 'dialog'))
+    ..createSync(recursive: true);
+  final sharedThemeDir = Directory(p.join(root, 'registry', 'shared', 'theme'))
+    ..createSync(recursive: true);
+  final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
     ..createSync(recursive: true);
 
   File(p.join(componentsDir.path, 'button.dart'))
@@ -402,12 +437,36 @@ void _writeRegistryFixtures(Directory registryRoot) {
     File(p.join(dialogDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"dialog"}');
 
+      File(p.join(sharedThemeDir.path, 'theme.dart'))
+        .writeAsStringSync('class ThemeHelper {}');
+      File(p.join(sharedUtilDir.path, 'util.dart'))
+        .writeAsStringSync('class UtilHelper {}');
+
   final registryJson = {
     'defaults': {
       'installPath': 'lib/ui/shadcn',
       'sharedPath': 'lib/ui/shadcn/shared',
     },
-    'shared': [],
+    'shared': [
+      {
+        'id': 'theme',
+        'files': [
+          {
+            'source': 'registry/shared/theme/theme.dart',
+            'destination': '{sharedPath}/theme/theme.dart'
+          }
+        ]
+      },
+      {
+        'id': 'util',
+        'files': [
+          {
+            'source': 'registry/shared/util/util.dart',
+            'destination': '{sharedPath}/util/util.dart'
+          }
+        ]
+      }
+    ],
     'components': [
       {
         'id': 'button',

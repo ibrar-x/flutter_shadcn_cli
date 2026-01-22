@@ -21,7 +21,11 @@ class Installer {
     CliLogger? logger,
   }) : logger = logger ?? const CliLogger();
 
-  Future<void> init() async {
+  Future<void> init({
+    bool skipPrompts = false,
+    InitConfigOverrides? configOverrides,
+    String? themePreset,
+  }) async {
     logger.header('Initializing flutter_shadcn');
     // Install all shared items that are marked as default/core if there were any, 
     // but typically we install shared items on demand or all of them for init?
@@ -33,11 +37,21 @@ class Installer {
     // Here we have specific shared modules.
     // Let's install 'theme' and 'util' as they are core.
     
-    await _ensureConfig();
+    if (configOverrides != null && configOverrides.hasAny) {
+      await _ensureConfigOverrides(configOverrides);
+    } else if (skipPrompts) {
+      await _ensureConfigDefaults();
+    } else {
+      await _ensureConfig();
+    }
 
     await installShared('theme');
     await installShared('util');
-    await _promptThemeSelection();
+    if (themePreset != null && themePreset.isNotEmpty) {
+      await applyThemeById(themePreset);
+    } else if (!skipPrompts) {
+      await _promptThemeSelection();
+    }
     await generateAliases();
     
     // Also install a few commonly used ones to be safe?
@@ -392,6 +406,72 @@ class Installer {
       ),
     );
     _cachedConfig = await ShadcnConfig.load(targetDir);
+  }
+
+  Future<void> _ensureConfigDefaults() async {
+    final existing = await ShadcnConfig.load(targetDir);
+    await ShadcnConfig.save(
+      targetDir,
+      existing.copyWith(
+        installPath: existing.installPath ?? _defaultInstallPath,
+        sharedPath: existing.sharedPath ?? _defaultSharedPath,
+        includeReadme: existing.includeReadme ?? false,
+        includeMeta: existing.includeMeta ?? true,
+        includePreview: existing.includePreview ?? false,
+      ),
+    );
+    _cachedConfig = await ShadcnConfig.load(targetDir);
+  }
+
+  Future<void> _ensureConfigOverrides(InitConfigOverrides overrides) async {
+    final existing = await ShadcnConfig.load(targetDir);
+    final normalizedInstall = _normalizePathOverride(
+      overrides.installPath,
+      _defaultInstallPath,
+    );
+    final normalizedShared = _normalizePathOverride(
+      overrides.sharedPath,
+      _defaultSharedPath,
+    );
+
+    final normalizedAliases = overrides.pathAliases == null
+        ? null
+        : overrides.pathAliases!.map(
+            (key, value) => MapEntry(key, _stripLibPrefix(value)),
+          );
+
+    await ShadcnConfig.save(
+      targetDir,
+      existing.copyWith(
+        installPath: normalizedInstall,
+        sharedPath: normalizedShared,
+        includeReadme: overrides.includeReadme ?? existing.includeReadme,
+        includeMeta: overrides.includeMeta ?? existing.includeMeta,
+        includePreview: overrides.includePreview ?? existing.includePreview,
+        classPrefix: overrides.classPrefix ?? existing.classPrefix,
+        pathAliases: normalizedAliases ?? existing.pathAliases,
+      ),
+    );
+    _cachedConfig = await ShadcnConfig.load(targetDir);
+  }
+
+  String _normalizePathOverride(String? value, String fallback) {
+    if (value == null || value.trim().isEmpty) {
+      return fallback;
+    }
+    final trimmed = _stripLibPrefix(value.trim());
+    return p.join('lib', trimmed);
+  }
+
+  String _stripLibPrefix(String value) {
+    final normalized = p.normalize(value);
+    if (normalized == 'lib') {
+      return '';
+    }
+    if (normalized.startsWith('lib${p.separator}')) {
+      return normalized.substring('lib'.length + 1);
+    }
+    return normalized;
   }
 
   String _defaultPrefix() {
@@ -882,4 +962,34 @@ class _DependencyUpdateResult {
   final List<String> added;
 
   const _DependencyUpdateResult(this.lines, this.added);
+}
+
+class InitConfigOverrides {
+  final String? installPath;
+  final String? sharedPath;
+  final bool? includeReadme;
+  final bool? includeMeta;
+  final bool? includePreview;
+  final String? classPrefix;
+  final Map<String, String>? pathAliases;
+
+  const InitConfigOverrides({
+    this.installPath,
+    this.sharedPath,
+    this.includeReadme,
+    this.includeMeta,
+    this.includePreview,
+    this.classPrefix,
+    this.pathAliases,
+  });
+
+  bool get hasAny {
+    return installPath != null ||
+        sharedPath != null ||
+        includeReadme != null ||
+        includeMeta != null ||
+        includePreview != null ||
+        classPrefix != null ||
+        pathAliases != null;
+  }
 }
