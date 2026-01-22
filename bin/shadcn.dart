@@ -16,7 +16,13 @@ Future<void> main(List<String> arguments) async {
     ..addOption('registry', allowed: ['auto', 'local', 'remote'], defaultsTo: 'auto')
     ..addOption('registry-path', help: 'Path to local registry folder')
     ..addOption('registry-url', help: 'Remote registry base URL (repo root)')
-    ..addCommand('init')
+    ..addCommand(
+      'init',
+      ArgParser()
+        ..addFlag('all', abbr: 'a', negatable: false)
+        ..addMultiOption('add', abbr: 'c')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
     ..addCommand(
       'theme',
       ArgParser()
@@ -113,7 +119,32 @@ Future<void> main(List<String> arguments) async {
 
   switch (argResults.command!.name) {
     case 'init':
+      final initCommand = argResults.command!;
+      if (initCommand['help'] == true) {
+        print('Usage: flutter_shadcn init [options]');
+        print('');
+        print('Options:');
+        print('  --add, -c <name>   Add components after init (repeatable)');
+        print('  --all, -a          Add every component after init');
+        print('  --help, -h         Show this message');
+        exit(0);
+      }
       await installer!.init();
+      final addAll = initCommand['all'] == true;
+      final addList = (initCommand['add'] as List).cast<String>();
+      if (addAll) {
+        for (final component in registry!.components) {
+          await installer!.addComponent(component.id);
+        }
+        await installer!.generateAliases();
+        break;
+      }
+      if (addList.isNotEmpty) {
+        for (final componentName in addList) {
+          await installer!.addComponent(componentName);
+        }
+        await installer!.generateAliases();
+      }
       break;
     case 'theme':
       final themeCommand = argResults.command!;
@@ -440,4 +471,4 @@ class _RemoteRoots {
 }
 
 const String _defaultRemoteRegistryBase =
-  'https://cdn.jsdelivr.net/gh/sunarya-thito/shadcn_flutter@latest/shadcn_flutter_kit/flutter_shadcn_kit/lib';
+  'https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib';

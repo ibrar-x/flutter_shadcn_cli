@@ -1,223 +1,306 @@
 # flutter_shadcn_cli
 
-CLI installer for the shadcn_flutter registry. It copies components and shared primitives into your Flutter app from either a local registry (development) or a remote registry (production).
+This tool puts ready‑made Flutter widgets into your app.
+
+Developer note: the CLI copies Dart files from the registry into your project, updates your pubspec when a widget needs extra packages, and saves your choices in .shadcn/config.json so you don’t have to repeat them.
+
+## 1) Install the tool
+
+```bash
+dart pub global activate flutter_shadcn_cli
+```
+
+Make sure this folder is in your PATH:
+
+```bash
+$HOME/.pub-cache/bin
+```
+
+## 2) Start in your app
+
+Run this inside your Flutter app folder:
+
+```bash
+flutter_shadcn init
+```
+
+You will be asked simple questions like:
+
+- Where to put files (inside lib/)
+- Which optional files to include
+
+## 3) Add a widget
+
+```bash
+flutter_shadcn add button
+```
+
+Add more than one widget:
+
+```bash
+flutter_shadcn add command dialog
+```
+
+Add every widget:
+
+```bash
+flutter_shadcn add --all
+```
+
+## One‑line setup (fast)
+
+Init and add in one command:
+
+```bash
+flutter_shadcn init --add button
+```
+
+Add multiple:
+
+```bash
+flutter_shadcn init --add button --add dialog
+```
+
+Add everything:
+
+```bash
+flutter_shadcn init --all
+```
+
+## Remove a widget
+
+```bash
+flutter_shadcn remove button
+```
+
+Force remove (even if other widgets depend on it):
+
+```bash
+flutter_shadcn remove button --force
+```
+# flutter_shadcn_cli
+
+CLI installer for the shadcn_flutter registry. It copies Widgets and shared helpers into your Flutter app from either a local registry (development) or a remote registry (production).
 
 ## Highlights
 
-- Local + remote registry support with auto-fallback.
+- Local + remote registry support with auto‑fallback.
 - Interactive init with install paths, optional files, and theme selection.
-- Dependency-aware installs with automatic pubspec updates.
+- Dependency‑aware installs with automatic pubspec updates.
 - Optional class aliases and folder path aliases.
 - Clean output with optional verbose mode.
 
 ## Install (pub.dev)
 
-- `dart pub global activate flutter_shadcn_cli`
-- Ensure `$HOME/.pub-cache/bin` is on your PATH.
+```bash
+dart pub global activate flutter_shadcn_cli
+```
+
+Make sure this folder is in your PATH:
+
+```bash
+$HOME/.pub-cache/bin
+```
 
 ## Quick Start
 
-### Initialize in a Flutter app
-- `flutter_shadcn init`
-  - Installs core shared assets (`theme`, `util`).
-  - Prompts for install directory and shared directory (must be under `lib/`).
-  - Prompts for optional files (`README.md`, `meta.json`, `preview.dart`).
-  - Prompts for optional class prefix (leave blank to skip aliases).
-  - Prompts to select a starter theme.
+### 1) Initialize in a Flutter app
 
-### Add components
-- `flutter_shadcn add button`
-- `flutter_shadcn add command dialog`
-- `flutter_shadcn add --all`
+```bash
+flutter_shadcn init
+```
 
-### Remove components
-- `flutter_shadcn remove button`
-- `flutter_shadcn remove button --force`
+You will be asked:
+
+- Where to put files (inside lib/)
+- Which optional files to include
+- Optional alias prefix
+- Theme preset
+
+### 2) Add Widgets
+
+```bash
+flutter_shadcn add button
+```
+
+Add more than one:
+
+```bash
+flutter_shadcn add command dialog
+```
+
+Add everything:
+
+```bash
+flutter_shadcn add --all
+```
+
+### 3) Remove Widgets
+
+```bash
+flutter_shadcn remove button
+```
+
+Force remove (even if others depend on it):
+
+```bash
+flutter_shadcn remove button --force
+```
+
+## One‑line setup (fast)
+
+Init and add in one command:
+
+```bash
+flutter_shadcn init --add button
+```
+
+Add multiple:
+
+```bash
+flutter_shadcn init --add button --add dialog
+```
+
+Add everything:
+
+```bash
+flutter_shadcn init --all
+```
 
 ## Registry Modes (Local vs Remote)
 
-The CLI resolves the registry in this order:
-
 ### Default (auto)
-- `--registry auto` (default)
+
 - Uses local registry if found, otherwise falls back to remote.
 
 ### Local registry (development)
-Use this when developing against a local copy of the registry.
 
-- `--registry local`
-- `--registry-path /absolute/path/to/registry`
-- Environment override: `SHADCN_REGISTRY_ROOT=/absolute/path/to/registry`
+```bash
+flutter_shadcn add button --registry local --registry-path /absolute/path/to/registry
+```
 
 Persist dev mode once (recommended):
-- `flutter_shadcn --dev --dev-path /absolute/path/to/registry init`
 
-This saves the local registry path to `.shadcn/config.json` so future commands
-use local mode by default without extra flags.
-
-The CLI searches for `registry/components.json` in:
-1. `--registry-path`
-2. `SHADCN_REGISTRY_ROOT`
-3. The global package registry (if installed globally)
-4. The CLI package’s own registry
-5. Parent folders of the CLI script
-6. Parent folders of the current working directory
+```bash
+flutter_shadcn --dev --dev-path /absolute/path/to/registry init
+```
 
 ### Remote registry (consumer install)
-Use this for end users who install from the hosted registry.
 
-- `--registry remote`
-- `--registry-url https://cdn.jsdelivr.net/gh/sunarya-thito/shadcn_flutter@latest/shadcn_flutter_kit/flutter_shadcn_kit/lib`
-- Environment override: `SHADCN_REGISTRY_URL=...`
+```bash
+flutter_shadcn add button --registry remote
+```
 
-**Default remote base URL (jsdelivr CDN):**
+Use a custom CDN URL:
 
-`https://cdn.jsdelivr.net/gh/sunarya-thito/shadcn_flutter@latest/shadcn_flutter_kit/flutter_shadcn_kit/lib`
+```bash
+flutter_shadcn add button --registry remote --registry-url https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib
+```
 
-The CLI expects `registry/components.json` under the base URL. If you point the base to a root containing `registry/`, it will automatically resolve `.../registry` for the registry index and use the base for file downloads.
+Default remote base URL (jsdelivr CDN):
+
+```text
+https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib
+```
 
 ## Config (.shadcn/config.json)
 
-The CLI stores user preferences per project:
+Saved choices per project:
 
-- `installPath` (default `lib/ui/shadcn`)
-- `sharedPath` (default `lib/ui/shadcn/shared`)
-- `includeReadme` (optional)
-- `includeMeta` (recommended)
-- `includePreview` (optional)
-- `classPrefix` (optional aliases)
-- `pathAliases` (optional `@alias` paths)
-- `registryMode`, `registryPath`, `registryUrl` (if set via `--dev` or overrides)
-
-You can edit `.shadcn/config.json` directly if needed.
+- installPath (default lib/ui/shadcn)
+- sharedPath (default lib/ui/shadcn/shared)
+- includeReadme (optional)
+- includeMeta (recommended)
+- includePreview (optional)
+- classPrefix (optional aliases)
+- pathAliases (optional @alias paths)
+- registryMode, registryPath, registryUrl
 
 ## Commands
 
-### `init`
-Initializes the shadcn_flutter structure in the current project.
+### init
 
-- Installs shared `theme` and `util`.
-- Prompts for install directory and shared directory.
-- Prompts for optional files (`README.md`, `meta.json`, `preview.dart`).
-- Creates `.shadcn/config.json`.
-- Prompts for optional alias prefix.
-- Prompts for theme selection.
+```bash
+flutter_shadcn init
+```
 
-### `add`
-Installs one or more components plus their dependencies.
+### add
 
-- `flutter_shadcn add button`
-- `flutter_shadcn add command dialog`
-- `flutter_shadcn add --all`
+```bash
+flutter_shadcn add button
+```
 
-Behavior:
-- Installs component dependencies first.
-- Installs required shared bundles.
-- Writes component files into your install path.
-- Adds missing `pubspec.yaml` dependencies automatically.
-- Generates aliases (if a prefix is configured).
+### remove
 
-### `remove`
-Removes a component and its files.
+```bash
+flutter_shadcn remove button
+```
 
-- `flutter_shadcn remove button`
-- `flutter_shadcn remove button --force`
+### theme
 
-Behavior:
-- Blocks removal if other installed components depend on it (unless `--force`).
-- Regenerates aliases after removal.
+```bash
+flutter_shadcn theme --list
+```
 
-### `theme`
-Manages registry theme presets.
+### doctor
 
-- `flutter_shadcn theme --list`
-- `flutter_shadcn theme --apply <preset-id>`
-- `flutter_shadcn theme` (interactive)
-
-### `doctor`
-Prints registry resolution diagnostics.
-
-- `flutter_shadcn doctor`
-
-## Aliases (Optional)
-
-The CLI can generate a single export file that aliases registry classes with a prefix (e.g., `AppButton`).
-
-- During `init`, you will be prompted for a class prefix.
-- Leave blank to skip alias generation.
-- The alias file is generated at:
-  - `lib/ui/shadcn/app_components.dart`
+```bash
+flutter_shadcn doctor
+```
 
 ## Folder Path Aliases
 
-During init you can set folder aliases (e.g. `ui=lib/ui, hooks=lib/hooks`).
+Set during init, for example:
 
-Use them in paths with `@alias`, for example:
+```text
+ui=lib/ui, hooks=lib/hooks
+```
 
-- `@ui/shadcn`
+Use them like:
 
-Aliases must resolve inside `lib/`.
+```text
+@ui/shadcn
+```
 
-## Install Paths
+## Optional Files
 
-The registry defaults are read from `components.json`:
-- `defaults.installPath` (typically `lib/ui/shadcn`)
-- `defaults.sharedPath` (typically `lib/ui/shadcn/shared`)
-
-All files are installed relative to these defaults.
-
-## Dependency Handling
-
-When a component declares `pubspec.dependencies`:
-- The CLI reads `pubspec.yaml`.
-- Adds only missing dependencies.
-- Skips any dependency already present.
-
-If `pubspec.yaml` is missing, it will skip dependency updates and print a warning.
+- meta.json is strongly recommended for audits and validation.
+- README.md and preview.dart are optional and skipped by default.
 
 ## Verbose Output
 
-Use `--verbose` to see detailed file operations.
-
-- `flutter_shadcn add button --verbose`
-
-## Examples
-
-### Local development
-- `flutter_shadcn add button --registry local --registry-path /path/to/shadcn_flutter/registry`
-
-### Persist local dev mode
-- `flutter_shadcn --dev --dev-path /path/to/shadcn_flutter/registry init`
-- `flutter_shadcn add button` (uses local registry automatically)
-
-### Remote consumer install
-- `flutter_shadcn add button --registry remote`
-
-### Remote using a custom CDN URL
-- `flutter_shadcn add button --registry remote --registry-url https://cdn.jsdelivr.net/gh/your-org/your-repo@latest/path/to/lib`
-
-## Recommended Optional Files
-
-- `meta.json` is strongly recommended for validation, audits, and CI checks against `components.json`.
-- `README.md` and `preview.dart` are optional and excluded by default.
-
-## Environment Variables
-
-- `SHADCN_REGISTRY_ROOT` — local registry path
-- `SHADCN_REGISTRY_URL` — remote registry base URL
+```bash
+flutter_shadcn add button --verbose
+```
 
 ## Troubleshooting
 
-- Run `flutter_shadcn doctor` to confirm registry resolution.
-- If components are not found:
-  - Check your registry base URL contains `registry/components.json`.
-  - Ensure network access when using remote mode.
-- If aliases are missing:
-  - Ensure you set a class prefix during `init`.
-  - Re-run `flutter_shadcn init` or edit `.shadcn/config.json`.
+```bash
+flutter_shadcn doctor
+```
 
-## Publishing
+If Widgets are not found:
 
-- Update this README for GitHub and pub.dev before release.
-- Ensure the default remote registry URL is correct.
-- Run tests before publishing.
+- Check your registry URL has registry/components.json.
+- Make sure you are online for remote installs.
+
+If aliases are missing:
+
+- Set a class prefix during init.
+- Run init again.
+
+## New Updates
+
+- One‑line setup with init --add/--all.
+- Local dev mode saved with --dev.
+- Optional file toggles (README.md, meta.json, preview.dart).
+- Folder alias support with @alias paths.
+
+## CLI Acknowledgements
+
+This copy–paste CLI was built from the ground up to make it easy to browse, configure and install Widgets into your Flutter projects. While many of the widgets and design tokens in this kit are adapted from the excellent shadcn_flutter library (https://github.com/sunarya-thito/shadcn_flutter), the CLI itself is an original tool designed specifically for our registry/studio workflow. It does not reuse or derive code from the official shadcn/ui CLI or other third‑party CLIs.
+
+You can see the refactored Widgets and documentation for this kit here:
+https://github.com/ibrar-x/shadcn_flutter_kit/tree/main/flutter_shadcn_kit
+
+Please refer to the upstream shadcn_flutter project for the canonical implementation and license details.
