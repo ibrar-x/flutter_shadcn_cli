@@ -1,0 +1,12 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - 'registry/**'
+    - 'templates/**'
+    - '../registry/**'
+    - '../comparison_app/**'
+    - '../playground/**'
+    - '../tools/**'
+    - '../docs/**'
+    - '../shadcn_flutter_cli/templates/**'
