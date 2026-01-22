@@ -45,8 +45,20 @@ class Installer {
       await _ensureConfig();
     }
 
-    await installShared('theme');
-    await installShared('util');
+    const coreShared = [
+      'theme',
+      'util',
+      'color_extensions',
+      'form_control',
+      'form_value_supplier',
+    ];
+    for (final sharedId in coreShared) {
+      await installShared(sharedId);
+    }
+    await _updateDependencies({
+      'data_widget': '^0.0.2',
+      'gap': '^3.0.1',
+    });
     if (themePreset != null && themePreset.isNotEmpty) {
       await applyThemeById(themePreset);
     } else if (!skipPrompts) {

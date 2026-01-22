@@ -41,6 +41,8 @@ You will be asked:
 - Optional alias prefix
 - Theme preset
 
+Init also installs core shared helpers (theme, util, color_extensions, form_control, form_value_supplier) and adds required packages (data_widget, gap).
+
 Skip questions and set everything in one command:
 
 ```bash
@@ -231,6 +233,30 @@ flutter_shadcn add button --verbose
 flutter_shadcn doctor
 ```
 
+### If a new flag is "not found"
+
+Sometimes the global executable uses an old cached snapshot. Fix it like this:
+
+```bash
+# Step 1: remove the global cache (this is safe)
+# The * is a wildcard that matches any folder name.
+rm -f ~/.pub-cache/hosted/*/bin/cache/flutter_shadcn_cli/* || true
+
+# Step 2: if you ran the CLI from a project folder, delete the local snapshot
+# (run this in your project root where .dart_tool/ exists)
+rm -f .dart_tool/pub/bin/flutter_shadcn_cli/*.snapshot || true
+
+# Step 3: confirm the flag exists
+flutter_shadcn --help
+```
+
+If that doesn’t work, re‑activate the CLI:
+
+```bash
+dart pub global deactivate flutter_shadcn_cli
+dart pub global activate flutter_shadcn_cli
+```
+
 If Widgets are not found:
 
 - Check your registry URL has registry/components.json.
@@ -247,6 +273,7 @@ If aliases are missing:
 - Local dev mode saved with --dev.
 - Optional file toggles (README.md, meta.json, preview.dart).
 - Folder alias support with @alias paths.
+- Init installs core shared helpers + required deps by default.
 
 ## CLI Acknowledgements
 

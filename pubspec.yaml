@@ -1,7 +1,8 @@
 name: flutter_shadcn_cli
-description: CLI for shadcn_flutter component registry.
+description: CLI for the shadcn_flutter registry.
 version: 0.1.2
-publish_to: 'none'
+repository: https://github.com/ibrar-x/flutter_shadcn_cli
+homepage: https://github.com/ibrar-x/flutter_shadcn_cli
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
