@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
@@ -5,6 +6,7 @@ import 'registry.dart';
 import 'config.dart';
 import 'logger.dart';
 import 'theme_css.dart';
+import 'state.dart';
 import 'package:flutter_shadcn_cli/registry/shared/theme/preset_theme_data.dart'
     show RegistryThemePresetData;
 
@@ -13,7 +15,17 @@ class Installer {
   final String targetDir; // The user's project root
   final CliLogger logger;
   Set<String>? _installedComponentCache;
+  final Set<String> _installingComponentIds = {};
+  final Set<String> _installingSharedIds = {};
   final Set<String> _installedSharedCache = {};
+  bool _initFilesEnsured = false;
+  bool _deferAliases = false;
+  bool _deferDependencyUpdates = false;
+  final Map<String, dynamic> _pendingDependencies = {};
+  final Set<String> _pendingAssets = {};
+  final List<FontEntry> _pendingFonts = [];
+  final Map<String, Future<void>> _componentInstallTasks = {};
+  bool _deferComponentManifest = false;
 
   Installer({
     required this.registry,
@@ -65,6 +77,8 @@ class Installer {
       await _promptThemeSelection();
     }
     await generateAliases();
+    await _updateComponentManifest();
+    await _updateState();
     
     // Also install a few commonly used ones to be safe?
     // Or just wait for 'add' to pull them in.
@@ -74,7 +88,12 @@ class Installer {
     logger.detail('Aliases written to lib/ui/shadcn/app_components.dart');
   }
 
-  Future<void> addComponent(String name) async {
+  Future<void> addComponent(
+    String name, {
+    bool installDependencies = true,
+    Set<String>? ancestry,
+  }) async {
+    await ensureInitFiles(allowPrompts: false);
     await _ensureConfigLoaded();
     final component = registry.getComponent(name);
     if (component == null) {
@@ -82,51 +101,465 @@ class Installer {
       return;
     }
 
-    final installed = await _installedComponentIds();
-    if (installed.contains(component.id)) {
-      logger.detail('Skipping ${component.id} (already installed)');
+    final stack = ancestry ?? <String>{};
+    if (stack.contains(component.id)) {
+      logger.detail('Skipping ${component.id} (dependency cycle)');
+      return;
+    }
+    stack.add(component.id);
+
+    final existingTask = _componentInstallTasks[component.id];
+    if (existingTask != null) {
+      await existingTask;
       return;
     }
 
-    logger.action('Installing ${component.name} (${component.id})');
-    
-    // 1. Install dependencies first
-    for (final dep in component.dependsOn) {
-      await addComponent(dep);
+    final completer = Completer<void>();
+    _componentInstallTasks[component.id] = completer.future;
+
+    if (_installingComponentIds.contains(component.id)) {
+      logger.detail('Skipping ${component.id} (already installing)');
+      _componentInstallTasks.remove(component.id);
+      completer.complete();
+      return;
     }
 
-    // 2. Install shared dependencies
-    for (final sharedId in component.shared) {
-      await installShared(sharedId);
+    try {
+      final installed = await _installedComponentIds();
+      if (installed.contains(component.id)) {
+        logger.detail('Skipping ${component.id} (already installed)');
+        return;
+      }
+
+      logger.action('Installing ${component.name} (${component.id})');
+      _installingComponentIds.add(component.id);
+      // 1. Install dependencies first
+      if (installDependencies) {
+        for (final dep in component.dependsOn) {
+          await addComponent(dep, ancestry: stack);
+        }
+      }
+
+      // 2. Install shared dependencies
+      for (final sharedId in component.shared) {
+        await installShared(sharedId);
+      }
+
+      // 3. Install component files
+      for (final file in component.files) {
+        await _installComponentFile(component, file);
+      }
+
+      // 4. Update pubspec (print instructions for now, or use dcli/automator)
+      if (component.pubspec.isNotEmpty) {
+        final deps = component.pubspec['dependencies'] as Map<String, dynamic>;
+        await _queueDependencyUpdates(deps);
+      }
+      if (component.assets.isNotEmpty) {
+        await _queueAssetUpdates(component.assets);
+      }
+      if (component.fonts.isNotEmpty) {
+        await _queueFontUpdates(component.fonts);
+      }
+      if (!_deferAliases) {
+        await generateAliases();
+      }
+      if (!_deferComponentManifest) {
+        await _updateComponentManifest();
+      }
+      if (!_deferComponentManifest) {
+        await _updateState();
+      }
+      if (!_deferDependencyUpdates) {
+        await _syncDependenciesWithInstalled();
+      }
+      _installedComponentCache?.add(component.id);
+    } catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+      rethrow;
+    } finally {
+      _installingComponentIds.remove(component.id);
+      _componentInstallTasks.remove(component.id);
+      stack.remove(component.id);
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  Future<void> installAllComponents({int concurrency = 6}) async {
+    await ensureInitFiles(allowPrompts: false);
+    final ids = registry.components.map((c) => c.id).toList();
+    if (ids.isEmpty) {
+      return;
     }
 
-    // 3. Install component files
-    for (final file in component.files) {
-      await _installFile(file);
+    var index = 0;
+    Future<void> worker() async {
+      while (true) {
+        if (index >= ids.length) {
+          break;
+        }
+        final id = ids[index++];
+        await addComponent(id, installDependencies: false);
+      }
     }
 
-    // 4. Update pubspec (print instructions for now, or use dcli/automator)
-    if (component.pubspec.isNotEmpty) {
-      final deps = component.pubspec['dependencies'] as Map<String, dynamic>;
-      await _updateDependencies(deps);
-    }
-    await generateAliases();
-    _installedComponentCache?.add(component.id);
+    final workerCount = concurrency.clamp(1, ids.length);
+    await Future.wait(
+      List.generate(workerCount, (_) => worker()),
+    );
   }
 
   Future<void> installShared(String id) async {
     await _ensureConfigLoaded();
-    final sharedItem = registry.shared.firstWhere((s) => s.id == id, orElse: () => throw Exception('Shared item $id not found'));
+    final resolvedId = _normalizeSharedId(id);
+    final sharedMatches = registry.shared.where((s) => s.id == resolvedId);
+    if (sharedMatches.isEmpty) {
+      final fallbackComponent = registry.getComponent(resolvedId);
+      if (fallbackComponent != null) {
+        await addComponent(resolvedId);
+        return;
+      }
+      logger.warn('Shared item "$id" not found');
+      return;
+    }
+    final sharedItem = sharedMatches.first;
 
-    if (_installedSharedCache.contains(id)) {
+    if (_installedSharedCache.contains(resolvedId)) {
       return;
     }
 
-    for (final file in sharedItem.files) {
-      await _installFile(file);
+    if (_installingSharedIds.contains(resolvedId)) {
+      return;
     }
 
-    _installedSharedCache.add(id);
+    _installingSharedIds.add(resolvedId);
+    try {
+      for (final file in sharedItem.files) {
+        await _installFile(file);
+      }
+
+      _installedSharedCache.add(resolvedId);
+    } finally {
+      _installingSharedIds.remove(resolvedId);
+    }
+  }
+
+  Future<void> ensureInitFiles({bool allowPrompts = false}) async {
+    if (_initFilesEnsured) {
+      return;
+    }
+    _initFilesEnsured = true;
+    final configFile = ShadcnConfig.configFile(targetDir);
+    final hasConfig = await configFile.exists();
+    if (!hasConfig) {
+      if (allowPrompts) {
+        await _ensureConfig();
+      } else {
+        await _ensureConfigDefaults();
+      }
+    } else {
+      await _ensureConfigLoaded();
+    }
+
+    final themeFile = File(_colorSchemeFilePath);
+    if (!themeFile.existsSync()) {
+      const coreShared = [
+        'theme',
+        'util',
+        'color_extensions',
+        'form_control',
+        'form_value_supplier',
+      ];
+      for (final sharedId in coreShared) {
+        await installShared(sharedId);
+      }
+      await _updateDependencies({
+        'data_widget': '^0.0.2',
+        'gap': '^3.0.1',
+      });
+    }
+  }
+
+  Future<void> runBulkInstall(Future<void> Function() action) async {
+    final previousAlias = _deferAliases;
+    final previousDeps = _deferDependencyUpdates;
+    final previousManifest = _deferComponentManifest;
+    _deferAliases = true;
+    _deferDependencyUpdates = true;
+    _deferComponentManifest = true;
+    try {
+      await action();
+    } finally {
+      _deferAliases = previousAlias;
+      _deferDependencyUpdates = previousDeps;
+      _deferComponentManifest = previousManifest;
+      if (_pendingDependencies.isNotEmpty) {
+        final pending = Map<String, dynamic>.from(_pendingDependencies);
+        _pendingDependencies.clear();
+        await _updateDependencies(pending);
+      }
+      if (_pendingAssets.isNotEmpty) {
+        final pending = _pendingAssets.toList()..sort();
+        _pendingAssets.clear();
+        await _updateAssets(pending);
+      }
+      if (_pendingFonts.isNotEmpty) {
+        final pending = List<FontEntry>.from(_pendingFonts);
+        _pendingFonts.clear();
+        await _updateFonts(pending);
+      }
+      await _syncDependenciesWithInstalled();
+      if (!_deferAliases) {
+        await generateAliases();
+      }
+      if (!_deferComponentManifest) {
+        await _updateComponentManifest();
+      }
+      await _updateState();
+    }
+  }
+
+  Future<void> _queueDependencyUpdates(Map<String, dynamic> deps) async {
+    if (!_deferDependencyUpdates) {
+      await _updateDependencies(deps);
+      return;
+    }
+    deps.forEach((key, value) {
+      if (value == null) {
+        return;
+      }
+      _pendingDependencies[key] = value;
+    });
+  }
+
+  Future<void> _queueAssetUpdates(List<String> assets) async {
+    if (assets.isEmpty) {
+      return;
+    }
+    if (!_deferDependencyUpdates) {
+      await _updateAssets(assets);
+      return;
+    }
+    _pendingAssets.addAll(assets);
+  }
+
+  Future<void> _queueFontUpdates(List<FontEntry> fonts) async {
+    if (fonts.isEmpty) {
+      return;
+    }
+    if (!_deferDependencyUpdates) {
+      await _updateFonts(fonts);
+      return;
+    }
+    _pendingFonts.addAll(fonts);
+  }
+
+  String _normalizeSharedId(String id) {
+    switch (id) {
+      case 'utils':
+        return 'util';
+      default:
+        return id;
+    }
+  }
+
+  Future<void> _updateComponentManifest() async {
+    await _ensureConfigLoaded();
+    final installPath = _installPath(_cachedConfig);
+    final manifestFile = File(p.join(targetDir, installPath, 'components.json'));
+    final installed = await _installedComponentIds();
+    if (installed.isEmpty) {
+      if (await manifestFile.exists()) {
+        await manifestFile.delete();
+      }
+      return;
+    }
+    final requiredDeps = _collectRequiredDependencies(installed);
+    final payload = {
+      'schemaVersion': 1,
+      'installPath': installPath,
+      'sharedPath': _sharedPath(_cachedConfig),
+      'installed': installed.toList()..sort(),
+      'managedDependencies': requiredDeps.keys.toList()..sort(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (!await manifestFile.parent.exists()) {
+      await manifestFile.parent.create(recursive: true);
+    }
+    await manifestFile.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(payload),
+    );
+  }
+
+  Map<String, dynamic> _collectRequiredDependencies(Set<String> installed) {
+    final required = <String, dynamic>{};
+    for (final id in installed) {
+      final component = registry.getComponent(id);
+      if (component == null || component.pubspec.isEmpty) {
+        continue;
+      }
+      final deps = component.pubspec['dependencies'] as Map<String, dynamic>?;
+      if (deps == null) {
+        continue;
+      }
+      deps.forEach((key, value) {
+        if (!required.containsKey(key)) {
+          required[key] = value;
+        }
+      });
+    }
+    return required;
+  }
+
+  Future<void> _syncDependenciesWithInstalled({
+    Set<String>? installedOverride,
+    Set<String>? managedOverride,
+  }) async {
+    final pubspecFile = File(p.join(targetDir, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) {
+      return;
+    }
+    final installed = installedOverride ?? await _installedComponentIds();
+    final required = _collectRequiredDependencies(installed);
+
+    final managedDeps = managedOverride ?? await _loadManagedDependencies();
+    final registryDeps = _collectAllRegistryDependencies();
+    final toRemove = (managedDeps.isEmpty ? registryDeps : managedDeps)
+        .difference(required.keys.toSet());
+
+    // Batch remove dependencies in a single command
+    if (toRemove.isNotEmpty) {
+      logger.info('Removing dependencies: ${toRemove.join(', ')}');
+      final result = await Process.run(
+        'dart',
+        ['pub', 'remove', ...toRemove],
+        workingDirectory: targetDir,
+      );
+      if (result.exitCode != 0) {
+        // Some packages might not exist, that's fine
+        logger.detail('Some dependencies could not be removed: ${result.stderr}');
+      }
+    }
+
+    // Collect dependencies to add (filter out already existing ones)
+    final lines = pubspecFile.readAsLinesSync();
+    final toAdd = <String>[];
+    for (final entry in required.entries) {
+      final dep = entry.key;
+      final version = entry.value;
+      final alreadyExists = lines.any((l) => l.trim().startsWith('$dep:'));
+      if (alreadyExists) {
+        continue;
+      }
+      // Format: package:version or just package
+      if (version is String && version.isNotEmpty) {
+        final cleanVersion = version.startsWith('^') ? version.substring(1) : version;
+        toAdd.add('$dep:$cleanVersion');
+      } else {
+        toAdd.add(dep);
+      }
+    }
+
+    // Batch add dependencies in a single command
+    if (toAdd.isNotEmpty) {
+      logger.info('Adding dependencies: ${toAdd.join(', ')}');
+      final result = await Process.run(
+        'dart',
+        ['pub', 'add', ...toAdd],
+        workingDirectory: targetDir,
+      );
+      if (result.exitCode != 0) {
+        logger.warn('Some dependencies could not be added: ${result.stderr}');
+      }
+    }
+  }
+
+  Future<Set<String>> _loadManagedDependencies() async {
+    final state = await ShadcnState.load(targetDir);
+    return state.managedDependencies?.toSet() ?? {};
+  }
+
+  Set<String> _collectAllRegistryDependencies() {
+    final deps = <String>{};
+    for (final component in registry.components) {
+      if (component.pubspec.isEmpty) {
+        continue;
+      }
+      final map = component.pubspec['dependencies'] as Map<String, dynamic>?;
+      if (map == null) {
+        continue;
+      }
+      deps.addAll(map.keys);
+    }
+    deps.addAll(_coreInitDependencies);
+    return deps;
+  }
+
+  static const Set<String> _coreInitDependencies = {
+    'data_widget',
+    'gap',
+  };
+
+  Future<void> _updateState() async {
+    await _ensureConfigLoaded();
+    final config = _cachedConfig ?? const ShadcnConfig();
+    final installed = await _installedComponentIds();
+    final required = _collectRequiredDependencies(installed);
+    final managed = <String>{...required.keys, ..._coreInitDependencies};
+    await ShadcnState.save(
+      targetDir,
+      ShadcnState(
+        installPath: _installPath(config),
+        sharedPath: _sharedPath(config),
+        themeId: config.themeId,
+        managedDependencies: managed.toList()..sort(),
+      ),
+    );
+  }
+
+  Future<void> syncFromConfig() async {
+    await ensureInitFiles(allowPrompts: false);
+    await _ensureConfigLoaded();
+    final config = _cachedConfig ?? const ShadcnConfig();
+    final state = await ShadcnState.load(targetDir);
+
+    final newInstall = _installPath(config);
+    final newShared = _sharedPath(config);
+
+    if (state.installPath != null && state.installPath != newInstall) {
+      final oldDir = Directory(p.join(targetDir, state.installPath!));
+      final newDir = Directory(p.join(targetDir, newInstall));
+      if (oldDir.existsSync()) {
+        if (!newDir.parent.existsSync()) {
+          newDir.parent.createSync(recursive: true);
+        }
+        oldDir.renameSync(newDir.path);
+      }
+    }
+
+    if (state.sharedPath != null && state.sharedPath != newShared) {
+      final oldShared = Directory(p.join(targetDir, state.sharedPath!));
+      final newSharedDir = Directory(p.join(targetDir, newShared));
+      if (oldShared.existsSync()) {
+        if (!newSharedDir.parent.existsSync()) {
+          newSharedDir.parent.createSync(recursive: true);
+        }
+        oldShared.renameSync(newSharedDir.path);
+      }
+    }
+
+    if (config.themeId != null && config.themeId != state.themeId) {
+      await applyThemeById(config.themeId!);
+    }
+
+    await _updateComponentManifest();
+    await generateAliases();
+    await _updateState();
+    logger.success('Sync complete');
   }
 
   Future<void> _installFile(RegistryFile file) async {
@@ -162,6 +595,30 @@ class Installer {
     await destFile.writeAsBytes(bytes, flush: true);
   }
 
+  Future<void> _installComponentFile(Component component, RegistryFile file) async {
+    await _ensureConfigLoaded();
+    final destination = _resolveComponentDestination(component, file);
+    final patched = RegistryFile.fromJson({
+      'source': file.source,
+      'destination': destination,
+    });
+    await _installFile(patched);
+  }
+
+  String _resolveComponentDestination(Component component, RegistryFile file) {
+    final config = _cachedConfig;
+    final installPath = _installPath(config);
+    final source = file.source.replaceAll('\\', '/');
+
+    const registryPrefix = 'registry/';
+    if (source.startsWith(registryPrefix)) {
+      final relative = source.substring(registryPrefix.length);
+      return p.join(targetDir, installPath, relative);
+    }
+
+    return _resolveDestinationPath(file.destination);
+  }
+
   Future<void> generateAliases() async {
     await _ensureConfigLoaded();
     final config = _cachedConfig ?? const ShadcnConfig();
@@ -178,17 +635,34 @@ class Installer {
 
     final aliases = <String, _AliasEntry>{};
     final imports = <String>{};
-    for (final entity in componentsDir.listSync()) {
+    final componentDirs = <String>{};
+    for (final entity in componentsDir.listSync(recursive: true)) {
       if (entity is! Directory) {
         continue;
       }
-      final componentDir = entity;
+      final dir = entity;
+      final name = p.basename(dir.path);
+      final mainFile = File(p.join(dir.path, '$name.dart'));
+      if (mainFile.existsSync()) {
+        componentDirs.add(dir.path);
+      }
+    }
+
+    for (final dirPath in componentDirs) {
+      final componentDir = Directory(dirPath);
       final componentName = p.basename(componentDir.path);
       final mainFile = File(p.join(componentDir.path, '$componentName.dart'));
       if (!mainFile.existsSync()) {
         continue;
       }
-      imports.add("components/$componentName/$componentName.dart");
+      final relativeDir = p.relative(
+        componentDir.path,
+        from: p.join(targetDir, _installPath(config)),
+      );
+      final importPath = p
+          .join(relativeDir, '$componentName.dart')
+          .replaceAll('\\', '/');
+      imports.add(importPath);
       final contents = <String>[];
       final mainContent = mainFile.readAsStringSync();
       contents.add(mainContent);
@@ -286,6 +760,102 @@ class Installer {
     await _applyThemePreset(preset);
   }
 
+  Future<void> applyThemeFromFile(String filePath) async {
+    final file = File(filePath);
+    if (!file.existsSync()) {
+      logger.warn('Theme file not found: $filePath');
+      return;
+    }
+    try {
+      final content = await file.readAsString();
+      final data = jsonDecode(content);
+      if (data is! Map<String, dynamic>) {
+        logger.warn('Theme file must contain a JSON object.');
+        return;
+      }
+      await applyThemeFromJson(data, sourceLabel: filePath);
+    } catch (e) {
+      logger.warn('Failed to read theme file: $e');
+    }
+  }
+
+  Future<void> applyThemeFromUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+      logger.warn('Theme URL must be a valid http/https URL.');
+      return;
+    }
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        logger.warn('Failed to fetch theme URL (status ${response.statusCode}).');
+        return;
+      }
+      final content = await response.transform(utf8.decoder).join();
+      final data = jsonDecode(content);
+      if (data is! Map<String, dynamic>) {
+        logger.warn('Theme URL must return a JSON object.');
+        return;
+      }
+      await applyThemeFromJson(data, sourceLabel: url);
+    } catch (e) {
+      logger.warn('Failed to fetch theme URL: $e');
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> applyThemeFromJson(
+    Map<String, dynamic> data, {
+    String? sourceLabel,
+  }) async {
+    final idRaw = data['id']?.toString().trim();
+    final nameRaw = data['name']?.toString().trim();
+    final id = (idRaw == null || idRaw.isEmpty) ? 'custom' : idRaw;
+    final name = (nameRaw == null || nameRaw.isEmpty) ? 'Custom' : nameRaw;
+    final light = _parseThemeColors(data['light'], 'light');
+    final dark = _parseThemeColors(data['dark'], 'dark');
+    if (light == null || dark == null) {
+      logger.warn('Theme JSON must include "light" and "dark" color maps.');
+      return;
+    }
+    final preset = RegistryThemePresetData(
+      id: id,
+      name: name,
+      light: light,
+      dark: dark,
+    );
+    await _applyThemePreset(preset);
+    if (sourceLabel != null && sourceLabel.isNotEmpty) {
+      logger.detail('Applied custom theme from: $sourceLabel');
+    }
+  }
+
+  Map<String, String>? _parseThemeColors(Object? raw, String label) {
+    if (raw is! Map) {
+      logger.warn('Theme "$label" must be an object of key/value colors.');
+      return null;
+    }
+    final result = <String, String>{};
+    raw.forEach((key, value) {
+      if (key == null) {
+        return;
+      }
+      final name = key.toString();
+      if (name.isEmpty || value == null) {
+        return;
+      }
+      result[name] = value.toString();
+    });
+    if (result.isEmpty) {
+      logger.warn('Theme "$label" contains no color entries.');
+      return null;
+    }
+    return result;
+  }
+
   Future<void> _interactiveThemeSelection({required bool skipIfConfigured}) async {
     final presets = await loadThemePresets();
     if (presets.isEmpty) {
@@ -368,28 +938,28 @@ class Installer {
     final resolvedAliases = _promptAliases(existing.pathAliases ?? const {});
 
     final resolvedInstallPath = _promptPath(
-      label: 'Install directory (inside lib/)',
+      label: 'Component install path inside lib/ (e.g. lib/ui/shadcn or lib/pages/docs)',
       current: existing.installPath ?? _defaultInstallPath,
       requireLib: true,
       aliases: resolvedAliases,
     );
     final resolvedSharedPath = _promptPath(
-      label: 'Shared directory (inside lib/)',
+      label: 'Shared files path inside lib/ (e.g. lib/ui/shadcn/shared)',
       current: existing.sharedPath ?? _defaultSharedPath,
       requireLib: true,
       aliases: resolvedAliases,
     );
 
     final includeReadme = _promptYesNo(
-      'Include README.md files? (optional)',
+      'Include README.md files for each component? (docs only)',
       defaultValue: existing.includeReadme ?? false,
     );
     final includeMeta = _promptYesNo(
-      'Include meta.json files? (recommended)',
+      'Include meta.json files (used by the CLI to track installs)?',
       defaultValue: existing.includeMeta ?? true,
     );
     final includePreview = _promptYesNo(
-      'Include preview.dart files? (optional)',
+      'Include preview.dart files (gallery previews)?',
       defaultValue: existing.includePreview ?? false,
     );
 
@@ -397,7 +967,7 @@ class Installer {
     if (prefix == null || prefix.isEmpty) {
       final defaultPrefix = _defaultPrefix();
       stdout.write(
-        'App class prefix (optional, e.g. $defaultPrefix, leave blank to skip): ',
+        'App class prefix for widgets (optional, e.g. $defaultPrefix). Enter to skip: ',
       );
       final input = stdin.readLineSync()?.trim();
       if (input != null && input.isNotEmpty) {
@@ -446,11 +1016,9 @@ class Installer {
       _defaultSharedPath,
     );
 
-    final normalizedAliases = overrides.pathAliases == null
-        ? null
-        : overrides.pathAliases!.map(
-            (key, value) => MapEntry(key, _stripLibPrefix(value)),
-          );
+    final normalizedAliases = overrides.pathAliases?.map(
+      (key, value) => MapEntry(key, _stripLibPrefix(value)),
+    );
 
     await ShadcnConfig.save(
       targetDir,
@@ -536,42 +1104,116 @@ class Installer {
   }
 
   Future<void> removeComponent(String name, {bool force = false}) async {
+    await ensureInitFiles(allowPrompts: false);
     await _ensureConfigLoaded();
     final component = registry.getComponent(name);
     if (component == null) {
-      logger.warn('Component "$name" not found in registry.');
+      logger.warn('Component "$name" not found');
       return;
     }
 
     final installed = await _installedComponentIds();
     if (!installed.contains(component.id)) {
-      logger.warn('Component "${component.id}" is not installed.');
+      logger.detail('Skipping ${component.id} (not installed)');
       return;
     }
 
-    if (!force) {
-      final dependents = _dependentComponents(component.id, installed);
-      if (dependents.isNotEmpty) {
-        logger.warn('Cannot remove "${component.id}" because it is required by:');
-        for (final dependent in dependents) {
-          logger.info('  - $dependent');
-        }
-        logger.info('Remove dependent components first or use --force.');
-        return;
-      }
+    final dependents = _dependentComponents(component.id, installed);
+    if (dependents.isNotEmpty && !force) {
+      logger.warn(
+        'Cannot remove ${component.id}; required by ${dependents.join(', ')}',
+      );
+      return;
     }
 
+    logger.action('Removing ${component.name} (${component.id})');
     for (final file in component.files) {
-      final destPath = _resolveDestinationPath(file.destination);
-      final destFile = File(destPath);
-      if (await destFile.exists()) {
-        await destFile.delete();
-        _cleanupEmptyParents(destFile.parent, component.id);
+      final destination = _resolveComponentDestination(component, file);
+      final targetFile = File(destination);
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+        _cleanupEmptyParents(targetFile.parent, component.id);
       }
     }
 
-    logger.success('Removed component: ${component.id}');
-    await generateAliases();
+    _installedComponentCache?.remove(component.id);
+    if (!_deferAliases) {
+      await generateAliases();
+    }
+    if (!_deferComponentManifest) {
+      await _updateComponentManifest();
+      await _updateState();
+    }
+    if (!_deferDependencyUpdates) {
+      await _syncDependenciesWithInstalled();
+    }
+    // Dependency sync already handled before removal.
+  }
+
+  Future<void> removeAllComponents({bool force = true}) async {
+    await ensureInitFiles(allowPrompts: false);
+    await _ensureConfigLoaded();
+    final managedDeps = await _loadManagedDependencies();
+    final installed = await _installedComponentIds();
+    if (installed.isEmpty) {
+      logger.info('No installed components to remove.');
+      await _removeAllInstallArtifacts();
+      _installedComponentCache = null;
+      if (!_deferDependencyUpdates) {
+        await _syncDependenciesWithInstalled(
+          installedOverride: const {},
+          managedOverride: managedDeps,
+        );
+      }
+      return;
+    }
+    if (!_deferDependencyUpdates) {
+      await _syncDependenciesWithInstalled(
+        installedOverride: const {},
+        managedOverride: managedDeps,
+      );
+    }
+    await runBulkInstall(() async {
+      for (final id in installed) {
+        await removeComponent(id, force: force);
+      }
+    });
+    await _removeAllInstallArtifacts();
+    _installedComponentCache = null;
+  }
+
+  Future<void> _removeAllInstallArtifacts() async {
+    final config = _cachedConfig ?? const ShadcnConfig();
+    final installRoot = Directory(p.join(targetDir, _installPath(config)));
+    final sharedRoot = Directory(p.join(targetDir, _sharedPath(config)));
+    final configRoot = Directory(p.join(targetDir, '.shadcn'));
+
+    if (installRoot.existsSync()) {
+      await installRoot.delete(recursive: true);
+    }
+    if (sharedRoot.existsSync()) {
+      await sharedRoot.delete(recursive: true);
+    }
+    if (configRoot.existsSync()) {
+      await configRoot.delete(recursive: true);
+    }
+
+    // Clean up empty parent directories (e.g., lib/ui/shadcn -> lib/ui -> lib)
+    final installPath = _installPath(config);
+    final parts = p.split(installPath);
+    for (var i = parts.length - 1; i >= 0; i--) {
+      final parentPath = p.joinAll(parts.sublist(0, i + 1));
+      final parentDir = Directory(p.join(targetDir, parentPath));
+      if (parentDir.existsSync()) {
+        final contents = parentDir.listSync();
+        if (contents.isEmpty) {
+          await parentDir.delete();
+          logger.detail('Removed empty directory: $parentPath');
+        } else {
+          break; // Stop if directory is not empty
+        }
+      }
+    }
   }
 
   Future<Set<String>> _installedComponentIds() async {
@@ -581,24 +1223,34 @@ class Installer {
     }
     final installPath = _installPath(_cachedConfig);
     final componentsDir = Directory(p.join(targetDir, installPath, 'components'));
-    if (!componentsDir.existsSync()) {
+    final compositesDir = Directory(p.join(targetDir, installPath, 'composites'));
+    if (!componentsDir.existsSync() && !compositesDir.existsSync()) {
       _installedComponentCache = {};
       return _installedComponentCache!;
     }
 
     final installed = <String>{};
-    for (final entry in componentsDir.listSync(recursive: true)) {
-      if (entry is! File || !entry.path.endsWith('meta.json')) {
-        continue;
-      }
-      try {
-        final content = await entry.readAsString();
-        final data = jsonDecode(content) as Map<String, dynamic>;
-        final id = data['id']?.toString();
-        if (id != null && id.isNotEmpty) {
-          installed.add(id);
+    final dirs = <Directory>[];
+    if (componentsDir.existsSync()) {
+      dirs.add(componentsDir);
+    }
+    if (compositesDir.existsSync()) {
+      dirs.add(compositesDir);
+    }
+    for (final dir in dirs) {
+      for (final entry in dir.listSync(recursive: true)) {
+        if (entry is! File || !entry.path.endsWith('meta.json')) {
+          continue;
         }
-      } catch (_) {}
+        try {
+          final content = await entry.readAsString();
+          final data = jsonDecode(content) as Map<String, dynamic>;
+          final id = data['id']?.toString();
+          if (id != null && id.isNotEmpty) {
+            installed.add(id);
+          }
+        } catch (_) {}
+      }
     }
     _installedComponentCache = installed;
     return installed;
@@ -621,11 +1273,14 @@ class Installer {
   void _cleanupEmptyParents(Directory dir, String componentId) {
     final installPath = _installPath(_cachedConfig);
     final componentRoot = p.normalize(
-      p.join(targetDir, installPath, 'components', componentId),
+      p.join(targetDir, installPath, 'components'),
     );
     var current = dir;
     while (p.normalize(current.path).startsWith(componentRoot)) {
       if (current.listSync().isNotEmpty) {
+        break;
+      }
+      if (p.normalize(current.path) == componentRoot) {
         break;
       }
       current.deleteSync();
@@ -692,7 +1347,7 @@ class Installer {
     Map<String, String>? aliases,
   }) {
     while (true) {
-      stdout.write('$label (default: $current): ');
+      stdout.write('$label (default: $current). Enter to keep: ');
       final input = stdin.readLineSync()?.trim();
       if (input == null || input.isEmpty) {
         return current;
@@ -705,15 +1360,19 @@ class Installer {
       if (normalized == 'lib' || normalized.startsWith('lib${p.separator}')) {
         return input;
       }
-      logger.warn('Path must be inside lib/. Try again.');
+      logger.warn('Path must start with lib/. Try again.');
     }
   }
 
   Map<String, String> _promptAliases(Map<String, String> current) {
     if (current.isNotEmpty) {
-      stdout.write('Path aliases (current: ${_formatAliases(current)}). Enter to keep: ');
+      stdout.write(
+        'Path aliases (current: ${_formatAliases(current)}). Format: name=lib/path. Enter to keep: ',
+      );
     } else {
-      stdout.write('Path aliases (optional, e.g. ui=lib/ui, hooks=lib/hooks): ');
+      stdout.write(
+        'Path aliases (optional). Format: name=lib/path (e.g. ui=lib/ui, hooks=lib/hooks): ',
+      );
     }
     final input = stdin.readLineSync()?.trim();
     if (input == null || input.isEmpty) {
@@ -775,7 +1434,7 @@ class Installer {
 
   bool _promptYesNo(String label, {required bool defaultValue}) {
     final defaultLabel = defaultValue ? 'Y' : 'n';
-    stdout.write('$label [${defaultLabel}/' + (defaultValue ? 'n' : 'Y') + ']: ');
+    stdout.write('$label [$defaultLabel/${defaultValue ? 'n' : 'Y'}]: ');
     final input = stdin.readLineSync()?.trim().toLowerCase();
     if (input == null || input.isEmpty) {
       return defaultValue;
@@ -813,15 +1472,57 @@ class Installer {
     logger.success('Added dependencies: ${result.added.join(', ')}');
   }
 
+  Future<void> _updateAssets(List<String> assets) async {
+    if (assets.isEmpty) {
+      return;
+    }
+    final pubspecFile = File(p.join(targetDir, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) {
+      logger.warn('pubspec.yaml not found; skipping asset updates.');
+      return;
+    }
+
+    final lines = pubspecFile.readAsLinesSync();
+    final result = _applyAssets(lines, assets);
+    if (result.added.isEmpty) {
+      logger.detail('Assets already present.');
+      return;
+    }
+
+    await pubspecFile.writeAsString(result.lines.join('\n'));
+    logger.success('Added assets: ${result.added.join(', ')}');
+  }
+
+  Future<void> _updateFonts(List<FontEntry> fonts) async {
+    if (fonts.isEmpty) {
+      return;
+    }
+    final pubspecFile = File(p.join(targetDir, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) {
+      logger.warn('pubspec.yaml not found; skipping font updates.');
+      return;
+    }
+
+    final lines = pubspecFile.readAsLinesSync();
+    final result = _applyFonts(lines, fonts);
+    if (result.added.isEmpty) {
+      logger.detail('Fonts already present.');
+      return;
+    }
+
+    await pubspecFile.writeAsString(result.lines.join('\n'));
+    logger.success('Added font families: ${result.added.join(', ')}');
+  }
+
   _DependencyUpdateResult _applyDependencies(
     List<String> lines,
     Map<String, dynamic> deps,
   ) {
     final existing = _collectExistingDependencies(lines);
-    final additions = <String, String>{};
+    final additions = <String, dynamic>{};
     deps.forEach((key, value) {
       if (!existing.contains(key)) {
-        additions[key] = value.toString();
+        additions[key] = value;
       }
     });
 
@@ -831,6 +1532,116 @@ class Installer {
 
     final update = _insertDependencies(lines, additions);
     return _DependencyUpdateResult(update, additions.keys.toList()..sort());
+  }
+
+  _AssetsUpdateResult _applyAssets(List<String> lines, List<String> assets) {
+    final normalized = assets.where((a) => a.trim().isNotEmpty).toSet().toList()
+      ..sort();
+    if (normalized.isEmpty) {
+      return _AssetsUpdateResult(lines, const []);
+    }
+
+    final flutterRange = _findFlutterSection(lines);
+    if (flutterRange.start == -1) {
+      final addedLines = <String>[
+        'flutter:',
+        '  assets:',
+        ...normalized.map((a) => '    - $a'),
+      ];
+      return _AssetsUpdateResult(
+        [...lines, if (lines.isNotEmpty) '', ...addedLines],
+        normalized,
+      );
+    }
+
+    final flutterIndent = _leadingSpaces(lines[flutterRange.start]);
+    final assetsIndex = _findSectionLine(lines, flutterRange, 'assets:');
+    if (assetsIndex == -1) {
+      final insertIndex = flutterRange.end;
+      final assetsIndent = ' ' * (flutterIndent + 2);
+      final assetItemIndent = ' ' * (flutterIndent + 4);
+      final insertion = <String>[
+        '$assetsIndent' 'assets:',
+        ...normalized.map((a) => '$assetItemIndent- $a'),
+      ];
+      final updated = [...lines]..insertAll(insertIndex, insertion);
+      return _AssetsUpdateResult(updated, normalized);
+    }
+
+    final assetsIndentCount = _leadingSpaces(lines[assetsIndex]);
+    final assetItemIndent = ' ' * (assetsIndentCount + 2);
+    final existing = <String>{};
+    var insertAt = assetsIndex + 1;
+    for (var i = assetsIndex + 1; i < flutterRange.end; i++) {
+      final line = lines[i];
+      if (line.trim().isEmpty || line.trim().startsWith('#')) {
+        continue;
+      }
+      if (_leadingSpaces(line) <= assetsIndentCount) {
+        break;
+      }
+      if (line.trim().startsWith('- ')) {
+        existing.add(line.trim().substring(2).trim());
+        insertAt = i + 1;
+      }
+    }
+
+    final additions = normalized.where((a) => !existing.contains(a)).toList();
+    if (additions.isEmpty) {
+      return _AssetsUpdateResult(lines, const []);
+    }
+    final updated = [...lines]
+      ..insertAll(insertAt, additions.map((a) => '$assetItemIndent- $a'));
+    return _AssetsUpdateResult(updated, additions);
+  }
+
+  _FontsUpdateResult _applyFonts(List<String> lines, List<FontEntry> fonts) {
+    if (fonts.isEmpty) {
+      return _FontsUpdateResult(lines, const []);
+    }
+
+    final flutterRange = _findFlutterSection(lines);
+    if (flutterRange.start == -1) {
+      final addedLines = <String>['flutter:', ..._formatFontSection(fonts, 2)];
+      final addedFamilies = fonts.map((f) => f.family).toList()..sort();
+      return _FontsUpdateResult(
+        [...lines, if (lines.isNotEmpty) '', ...addedLines],
+        addedFamilies,
+      );
+    }
+
+    final flutterIndent = _leadingSpaces(lines[flutterRange.start]);
+    final fontsIndex = _findSectionLine(lines, flutterRange, 'fonts:');
+    if (fontsIndex == -1) {
+      final insertIndex = flutterRange.end;
+      final insertion = _formatFontSection(fonts, flutterIndent + 2);
+      final updated = [...lines]..insertAll(insertIndex, insertion);
+      final addedFamilies = fonts.map((f) => f.family).toList()..sort();
+      return _FontsUpdateResult(updated, addedFamilies);
+    }
+
+    final fontsIndentCount = _leadingSpaces(lines[fontsIndex]);
+    final fontsRange = _findSectionEnd(lines, fontsIndex, fontsIndentCount);
+    final existingFamilies = <String>{};
+    for (var i = fontsIndex + 1; i < fontsRange.end; i++) {
+      final line = lines[i].trimLeft();
+      if (line.startsWith('- family:')) {
+        final family = line.split(':').skip(1).join(':').trim();
+        if (family.isNotEmpty) {
+          existingFamilies.add(family);
+        }
+      }
+    }
+
+    final additions = fonts.where((f) => !existingFamilies.contains(f.family)).toList();
+    if (additions.isEmpty) {
+      return _FontsUpdateResult(lines, const []);
+    }
+
+    final insertion = _formatFontSection(additions, fontsIndentCount + 2);
+    final updated = [...lines]..insertAll(fontsRange.end, insertion);
+    final addedFamilies = additions.map((f) => f.family).toList()..sort();
+    return _FontsUpdateResult(updated, addedFamilies);
   }
 
   Set<String> _collectExistingDependencies(List<String> lines) {
@@ -893,7 +1704,7 @@ class Installer {
 
   List<String> _insertDependencies(
     List<String> lines,
-    Map<String, String> additions,
+    Map<String, dynamic> additions,
   ) {
     final updated = List<String>.from(lines);
     final depsIndex = _findSectionIndex(updated, 'dependencies:');
@@ -904,7 +1715,7 @@ class Installer {
       final entries = additions.entries.toList()
         ..sort((a, b) => a.key.compareTo(b.key));
       for (final entry in entries) {
-        updated.add('$indent${entry.key}: ${entry.value}');
+        updated.addAll(_formatDependencyLines(entry.key, entry.value, indent));
       }
       return updated;
     }
@@ -928,11 +1739,34 @@ class Installer {
 
     final entries = additions.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-    final linesToInsert = entries
-        .map((entry) => '$childIndent${entry.key}: ${entry.value}')
-        .toList();
+    final linesToInsert = <String>[];
+    for (final entry in entries) {
+      linesToInsert.addAll(_formatDependencyLines(entry.key, entry.value, childIndent));
+    }
     updated.insertAll(insertIndex, linesToInsert);
     return updated;
+  }
+
+  List<String> _formatDependencyLines(String key, dynamic value, String indent) {
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.startsWith('sdk:')) {
+        final sdkValue = trimmed.split(':').skip(1).join(':').trim();
+        return [
+          '$indent$key:',
+          '$indent  sdk: $sdkValue',
+        ];
+      }
+    }
+    if (value is Map) {
+      final lines = <String>['$indent$key:'];
+      final childIndent = '$indent  ';
+      value.forEach((k, v) {
+        lines.add('$childIndent$k: $v');
+      });
+      return lines;
+    }
+    return ['$indent$key: ${value.toString()}'];
   }
 
   int _findSectionIndex(List<String> lines, String section) {
@@ -942,6 +1776,63 @@ class Installer {
       }
     }
     return -1;
+  }
+
+  _SectionRange _findFlutterSection(List<String> lines) {
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() == 'flutter:' && _leadingSpaces(lines[i]) == 0) {
+        final end = _findSectionEnd(lines, i, 0).end;
+        return _SectionRange(i, end);
+      }
+    }
+    return const _SectionRange(-1, -1);
+  }
+
+  int _findSectionLine(List<String> lines, _SectionRange range, String key) {
+    for (var i = range.start + 1; i < range.end; i++) {
+      final line = lines[i].trim();
+      if (line == key) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  _SectionRange _findSectionEnd(List<String> lines, int start, int indent) {
+    var end = lines.length;
+    for (var i = start + 1; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.trim().isEmpty || line.trim().startsWith('#')) {
+        continue;
+      }
+      if (_leadingSpaces(line) <= indent) {
+        end = i;
+        break;
+      }
+    }
+    return _SectionRange(start, end);
+  }
+
+  List<String> _formatFontSection(List<FontEntry> fonts, int indentCount) {
+    final indent = ' ' * indentCount;
+    final itemIndent = ' ' * (indentCount + 2);
+    final innerIndent = ' ' * (indentCount + 4);
+    final assetIndent = ' ' * (indentCount + 6);
+    final lines = <String>['$indent' 'fonts:'];
+    for (final entry in fonts) {
+      lines.add('$itemIndent- family: ${entry.family}');
+      lines.add('$innerIndent' 'fonts:');
+      for (final font in entry.fonts) {
+        lines.add('$assetIndent- asset: ${font.asset}');
+        if (font.weight != null) {
+          lines.add('$assetIndent  weight: ${font.weight}');
+        }
+        if (font.style != null) {
+          lines.add('$assetIndent  style: ${font.style}');
+        }
+      }
+    }
+    return lines;
   }
 
   int _leadingSpaces(String line) {
@@ -974,6 +1865,27 @@ class _DependencyUpdateResult {
   final List<String> added;
 
   const _DependencyUpdateResult(this.lines, this.added);
+}
+
+class _AssetsUpdateResult {
+  final List<String> lines;
+  final List<String> added;
+
+  const _AssetsUpdateResult(this.lines, this.added);
+}
+
+class _FontsUpdateResult {
+  final List<String> lines;
+  final List<String> added;
+
+  const _FontsUpdateResult(this.lines, this.added);
+}
+
+class _SectionRange {
+  final int start;
+  final int end;
+
+  const _SectionRange(this.start, this.end);
 }
 
 class InitConfigOverrides {

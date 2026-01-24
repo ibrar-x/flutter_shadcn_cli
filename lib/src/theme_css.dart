@@ -18,16 +18,30 @@ Future<void> applyPresetToColorScheme({
   final updatedLight = _updateBlock(lightBlock.block, preset.light);
   final updatedDark = _updateBlock(darkBlock.block, preset.dark);
 
-  var updated = content.replaceRange(
-    lightBlock.start,
-    lightBlock.end,
-    updatedLight,
-  );
-  updated = updated.replaceRange(
-    darkBlock.start,
-    darkBlock.end,
-    updatedDark,
-  );
+  var updated = content;
+  if (lightBlock.start < darkBlock.start) {
+    updated = updated.replaceRange(
+      darkBlock.start,
+      darkBlock.end,
+      updatedDark,
+    );
+    updated = updated.replaceRange(
+      lightBlock.start,
+      lightBlock.end,
+      updatedLight,
+    );
+  } else {
+    updated = updated.replaceRange(
+      lightBlock.start,
+      lightBlock.end,
+      updatedLight,
+    );
+    updated = updated.replaceRange(
+      darkBlock.start,
+      darkBlock.end,
+      updatedDark,
+    );
+  }
   await file.writeAsString(updated);
 }
 
@@ -40,7 +54,7 @@ String _updateBlock(String block, Map<String, String> values) {
       '(\\b$key:\\s*Color\\()(?:0x)?([0-9A-Fa-f]{8})(\\))',
     );
     updated = updated.replaceAllMapped(pattern, (match) {
-      return '${match.group(1)}$normalized${match.group(3)}';
+      return '${match.group(1)}0x$normalized${match.group(3)}';
     });
   }
   return updated;

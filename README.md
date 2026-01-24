@@ -4,9 +4,11 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 
 - Local + remote registry support with auto‑fallback.
 - Interactive init with install paths, optional files, and theme selection.
-- Dependency‑aware installs with automatic pubspec updates.
+- Dependency‑aware installs with batched pubspec updates.
 - Optional class aliases and folder path aliases.
 - Clean output with optional verbose mode.
+- Tracks installed Widgets in a local components.json.
+- Full cleanup on remove --all (components, composites, shared, config, empty folders).
 
 ## Install (pub.dev)
 
@@ -34,11 +36,18 @@ Skip questions and use defaults:
 flutter_shadcn init --yes
 ```
 
+Install typography + icon font assets during init:
+
+```bash
+flutter_shadcn init --install-fonts --install-icons
+```
+
 You will be asked:
 
-- Where to put files (inside lib/)
+- Component install path inside lib/ (e.g. lib/ui/shadcn or lib/pages/docs)
+- Shared files path inside lib/ (e.g. lib/ui/shadcn/shared)
 - Which optional files to include
-- Optional alias prefix
+- Optional class prefix for widget names
 - Theme preset
 
 Init also installs core shared helpers (theme, util, color_extensions, form_control, form_value_supplier) and adds required packages (data_widget, gap).
@@ -75,6 +84,12 @@ Add everything:
 flutter_shadcn add --all
 ```
 
+Add assets only:
+
+```bash
+flutter_shadcn assets --all
+```
+
 ### 3) Remove Widgets
 
 ```bash
@@ -85,6 +100,12 @@ Force remove (even if others depend on it):
 
 ```bash
 flutter_shadcn remove button --force
+```
+
+Remove everything:
+
+```bash
+flutter_shadcn remove --all
 ```
 
 ## One‑line setup (fast)
@@ -150,6 +171,9 @@ Saved choices per project:
 - pathAliases (optional @alias paths)
 - registryMode, registryPath, registryUrl
 
+The CLI also writes a local manifest at `<installPath>/components.json` with
+the list of installed Widgets.
+
 ## Commands
 
 ### init
@@ -162,6 +186,12 @@ Use defaults (no questions):
 
 ```bash
 flutter_shadcn init --yes
+```
+
+Install fonts + icons during init:
+
+```bash
+flutter_shadcn init --install-fonts --install-icons
 ```
 
 Set all values in one command:
@@ -184,10 +214,32 @@ flutter_shadcn init --yes \
 flutter_shadcn add button
 ```
 
+### assets
+
+```bash
+flutter_shadcn assets --list
+```
+
+```bash
+flutter_shadcn assets --icons
+```
+
+```bash
+flutter_shadcn assets --fonts
+```
+
+```bash
+flutter_shadcn assets --all
+```
+
 ### remove
 
 ```bash
 flutter_shadcn remove button
+```
+
+```bash
+flutter_shadcn remove --all
 ```
 
 ### theme
@@ -195,6 +247,30 @@ flutter_shadcn remove button
 ```bash
 flutter_shadcn theme --list
 ```
+
+Apply a custom theme JSON file (experimental):
+
+```bash
+flutter_shadcn --experimental theme --apply-file /path/to/theme.json
+```
+
+Example JSON structure:
+
+- [theme_example.json](theme_example.json)
+
+Apply a custom theme JSON URL (experimental):
+
+```bash
+flutter_shadcn --experimental theme --apply-url https://example.com/theme.json
+```
+
+### sync
+
+```bash
+flutter_shadcn sync
+```
+
+Use `sync` after editing .shadcn/config.json to move paths and re-apply the theme.
 
 ### doctor
 
@@ -267,6 +343,11 @@ If aliases are missing:
 - Set a class prefix during init.
 - Run init again.
 
+## Feature Flags
+
+- `--wip`: Enables WIP features.
+- `--experimental`: Enables experimental features (required for theme file/url).
+
 ## New Updates
 
 - One‑line setup with init --add/--all.
@@ -274,6 +355,10 @@ If aliases are missing:
 - Optional file toggles (README.md, meta.json, preview.dart).
 - Folder alias support with @alias paths.
 - Init installs core shared helpers + required deps by default.
+- `assets` command for installing icon/typography fonts.
+- Init flags for installing icons/fonts on demand.
+- Dependency updates are batched for faster installs/removals.
+- remove --all cleans empty parent folders after deleting files.
 
 ## CLI Acknowledgements
 

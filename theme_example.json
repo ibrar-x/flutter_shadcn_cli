@@ -1,0 +1,20 @@
+{
+  "id": "custom",
+  "name": "Custom Theme",
+  "light": {
+    "background": "#FFFFFF",
+    "foreground": "#09090B",
+    "primary": "#1447E6",
+    "primaryForeground": "#EFF6FF",
+    "border": "#E4E4E7",
+    "ring": "#A1A1A1"
+  },
+  "dark": {
+    "background": "#09090B",
+    "foreground": "#FAFAFA",
+    "primary": "#2B7FFF",
+    "primaryForeground": "#EFF6FF",
+    "border": "#FFFFFF1A",
+    "ring": "#737373"
+  }
+}

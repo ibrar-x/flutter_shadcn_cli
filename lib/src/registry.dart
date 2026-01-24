@@ -113,19 +113,27 @@ class SharedItem {
 class Component {
   final String id;
   final String name;
+  final String? category;
   final List<RegistryFile> files;
   final List<String> shared;
   final List<String> dependsOn;
+  final List<String> assets;
+  final List<FontEntry> fonts;
   final Map<String, dynamic> pubspec;
 
   Component.fromJson(Map<String, dynamic> json)
       : id = json['id'],
         name = json['name'],
+        category = json['category'] as String?,
         files = (json['files'] as List)
             .map((e) => RegistryFile.fromJson(e))
             .toList(),
         shared = List<String>.from(json['shared'] ?? []),
         dependsOn = List<String>.from(json['dependsOn'] ?? []),
+        assets = List<String>.from(json['assets'] ?? []),
+        fonts = (json['fonts'] as List<dynamic>? ?? const [])
+            .map((e) => FontEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
         pubspec = json['pubspec'] ?? {};
 }
 
@@ -136,4 +144,26 @@ class RegistryFile {
   RegistryFile.fromJson(Map<String, dynamic> json)
       : source = json['source'],
         destination = json['destination'];
+}
+
+class FontEntry {
+  final String family;
+  final List<FontAsset> fonts;
+
+  FontEntry.fromJson(Map<String, dynamic> json)
+      : family = json['family'] as String,
+        fonts = (json['fonts'] as List<dynamic>? ?? const [])
+            .map((e) => FontAsset.fromJson(e as Map<String, dynamic>))
+            .toList();
+}
+
+class FontAsset {
+  final String asset;
+  final int? weight;
+  final String? style;
+
+  FontAsset.fromJson(Map<String, dynamic> json)
+      : asset = json['asset'] as String,
+        weight = json['weight'] as int?,
+        style = json['style'] as String?;
 }

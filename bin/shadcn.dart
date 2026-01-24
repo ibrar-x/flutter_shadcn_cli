@@ -11,6 +11,9 @@ Future<void> main(List<String> arguments) async {
   _ensureExecutablePath();
   final parser = ArgParser()
     ..addFlag('verbose', abbr: 'v', negatable: false)
+    ..addFlag('help', abbr: 'h', negatable: false)
+    ..addFlag('wip', negatable: false, help: 'Enable WIP features')
+    ..addFlag('experimental', negatable: false, help: 'Enable experimental features')
     ..addFlag('dev', negatable: false, help: 'Persist local registry for dev mode')
     ..addOption('dev-path', help: 'Local registry path to persist for dev mode')
     ..addOption('registry', allowed: ['auto', 'local', 'remote'], defaultsTo: 'auto')
@@ -22,6 +25,16 @@ Future<void> main(List<String> arguments) async {
         ..addFlag('all', abbr: 'a', negatable: false)
         ..addMultiOption('add', abbr: 'c')
         ..addFlag('yes', abbr: 'y', negatable: false)
+        ..addFlag(
+          'install-fonts',
+          negatable: false,
+          help: 'Install typography fonts during init',
+        )
+        ..addFlag(
+          'install-icons',
+          negatable: false,
+          help: 'Install icon font assets during init',
+        )
         ..addOption('install-path', help: 'Install path inside lib/')
         ..addOption('shared-path', help: 'Shared path inside lib/')
         ..addFlag('include-readme', negatable: true)
@@ -29,7 +42,10 @@ Future<void> main(List<String> arguments) async {
         ..addFlag('include-preview', negatable: true)
         ..addOption('prefix', help: 'Class alias prefix')
         ..addOption('theme', help: 'Theme preset id')
-        ..addMultiOption('alias', help: 'Path alias, e.g. ui=lib/ui')
+        ..addMultiOption(
+          'alias',
+          help: 'Path alias (name=lib/path). Enables @name shorthand.',
+        )
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -37,6 +53,8 @@ Future<void> main(List<String> arguments) async {
       ArgParser()
         ..addFlag('list', negatable: false)
         ..addOption('apply', abbr: 'a')
+        ..addOption('apply-file', help: 'Apply theme from local JSON file')
+        ..addOption('apply-url', help: 'Apply theme from JSON URL')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -48,10 +66,32 @@ Future<void> main(List<String> arguments) async {
     ..addCommand(
       'remove',
       ArgParser()
+        ..addFlag('all', abbr: 'a', negatable: false)
         ..addFlag('force', abbr: 'f', negatable: false)
         ..addFlag('help', abbr: 'h', negatable: false),
     )
-    ..addCommand('doctor');
+    ..addCommand(
+      'sync',
+      ArgParser()..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'doctor',
+      ArgParser()..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'assets',
+      ArgParser()
+        ..addFlag('icons', negatable: false, help: 'Install icon font assets')
+        ..addFlag(
+          'typography',
+          negatable: false,
+          help: 'Install typography font assets (GeistSans/GeistMono)',
+        )
+        ..addFlag('fonts', negatable: false, help: 'Alias for --typography')
+        ..addFlag('list', negatable: false, help: 'List available assets')
+        ..addFlag('all', abbr: 'a', negatable: false)
+        ..addFlag('help', abbr: 'h', negatable: false),
+    );
 
   ArgResults argResults;
   try {
@@ -61,14 +101,13 @@ Future<void> main(List<String> arguments) async {
     exit(1);
   }
 
+  if (argResults['help'] == true) {
+    _printUsage();
+    exit(0);
+  }
+
   if (argResults.command == null) {
-    print('Usage: flutter_shadcn <command> [arguments]');
-    print('Commands:');
-    print('  init   Initialize shadcn_flutter in the current project');
-    print('  theme  Manage registry theme presets');
-    print('  add    Add a component');
-    print('  remove  Remove a component');
-    print('  doctor  Diagnose registry resolution');
+    _printUsage();
     exit(1);
   }
 
@@ -98,11 +137,18 @@ Future<void> main(List<String> arguments) async {
   }
 
   if (argResults.command!.name == 'doctor') {
+    final doctorCommand = argResults.command!;
+    if (doctorCommand['help'] == true) {
+      print('Usage: flutter_shadcn doctor');
+      print('');
+      print('Diagnostics for registry resolution and environment.');
+      return;
+    }
     _runDoctor(roots, argResults, config);
     return;
   }
 
-  final needsRegistry = const {'init', 'theme', 'add', 'remove'};
+  final needsRegistry = const {'init', 'theme', 'add', 'remove', 'sync', 'assets'};
   Registry? registry;
   if (needsRegistry.contains(argResults.command!.name)) {
     final selection = _resolveRegistrySelection(argResults, roots, config);
@@ -129,77 +175,165 @@ Future<void> main(List<String> arguments) async {
   switch (argResults.command!.name) {
     case 'init':
       final initCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
       if (initCommand['help'] == true) {
         print('Usage: flutter_shadcn init [options]');
         print('');
         print('Options:');
         print('  --add, -c <name>   Add components after init (repeatable)');
         print('  --all, -a          Add every component after init');
+        print('  --yes, -y          Skip prompts and use defaults');
+        print('  --install-fonts    Install typography fonts during init');
+        print('  --install-icons    Install icon font assets during init');
+        print('  --install-path     Component install path inside lib/');
+        print('  --shared-path      Shared helpers path inside lib/');
+        print('  --include-meta     Include meta.json files (recommended)');
+        print('  --include-readme   Include README.md files');
+        print('  --include-preview  Include preview.dart files');
+        print('  --prefix           Class prefix for widget aliases');
+        print('  --theme            Theme preset id');
+        print(
+          '  --alias            Path alias (name=lib/path), allows @name in paths',
+        );
         print('  --help, -h         Show this message');
         exit(0);
       }
       final skipPrompts = initCommand['yes'] == true;
       final aliasPairs = (initCommand['alias'] as List).cast<String>();
       final aliases = _parseAliasPairs(aliasPairs);
-      await installer!.init(
+      final installFonts = initCommand['install-fonts'] == true;
+      final installIcons = initCommand['install-icons'] == true;
+      final includeReadme = initCommand.wasParsed('include-readme')
+          ? initCommand['include-readme'] as bool
+          : null;
+      final includeMeta = initCommand.wasParsed('include-meta')
+          ? initCommand['include-meta'] as bool
+          : null;
+      final includePreview = initCommand.wasParsed('include-preview')
+          ? initCommand['include-preview'] as bool
+          : null;
+      final installPath = initCommand.wasParsed('install-path')
+          ? initCommand['install-path'] as String?
+          : null;
+      final sharedPath = initCommand.wasParsed('shared-path')
+          ? initCommand['shared-path'] as String?
+          : null;
+      final classPrefix = initCommand.wasParsed('prefix')
+          ? initCommand['prefix'] as String?
+          : null;
+      final aliasOverrides = initCommand.wasParsed('alias') && aliases.isNotEmpty
+          ? aliases
+          : null;
+
+      await activeInstaller.init(
         skipPrompts: skipPrompts,
         configOverrides: InitConfigOverrides(
-          installPath: initCommand['install-path'] as String?,
-          sharedPath: initCommand['shared-path'] as String?,
-          includeReadme: initCommand['include-readme'] as bool?,
-          includeMeta: initCommand['include-meta'] as bool?,
-          includePreview: initCommand['include-preview'] as bool?,
-          classPrefix: initCommand['prefix'] as String?,
-          pathAliases: aliases.isEmpty ? null : aliases,
+          installPath: installPath,
+          sharedPath: sharedPath,
+          includeReadme: includeReadme,
+          includeMeta: includeMeta,
+          includePreview: includePreview,
+          classPrefix: classPrefix,
+          pathAliases: aliasOverrides,
         ),
         themePreset: initCommand['theme'] as String?,
       );
+
+      if (installFonts || installIcons) {
+        await activeInstaller.runBulkInstall(() async {
+          if (installIcons) {
+            await activeInstaller.addComponent('icon_fonts');
+          }
+          if (installFonts) {
+            await activeInstaller.addComponent('typography_fonts');
+          }
+        });
+      }
+
       final addAll = initCommand['all'] == true;
       final addList = <String>[
         ...(initCommand['add'] as List).cast<String>(),
         ...initCommand.rest,
       ];
       if (addAll) {
-        for (final component in registry!.components) {
-          await installer.addComponent(component.id);
-        }
-        await installer.generateAliases();
+        await activeInstaller.runBulkInstall(() async {
+          await activeInstaller.addComponent('icon_fonts');
+          await activeInstaller.addComponent('typography_fonts');
+          await activeInstaller.installAllComponents();
+        });
         break;
       }
       if (addList.isNotEmpty) {
-        for (final componentName in addList) {
-          await installer.addComponent(componentName);
-        }
-        await installer.generateAliases();
+        await activeInstaller.runBulkInstall(() async {
+          for (final componentName in addList) {
+            await activeInstaller.addComponent(componentName);
+          }
+        });
       }
       break;
     case 'theme':
       final themeCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
       if (themeCommand['help'] == true) {
         print(
-            'Usage: flutter_shadcn theme [--list | --apply <preset>] [--help]');
+            'Usage: flutter_shadcn theme [--list | --apply <preset> | --apply-file <path> | --apply-url <url>]');
         print('');
         print('Options:');
         print('  --list             Show all available theme presets');
         print('  --apply, -a <id>   Apply the preset with the given ID');
+        print('  --apply-file       Apply a theme JSON file (experimental)');
+        print('  --apply-url        Apply a theme JSON URL (experimental)');
         print('  --help, -h         Show this message');
+        print('');
+        print('Experimental:');
+        print('  Use --experimental to enable apply-file/apply-url.');
         exit(0);
       }
+      final isExperimental = argResults['experimental'] == true;
       if (themeCommand['list'] == true) {
-        await installer!.listThemes();
+        await activeInstaller.listThemes();
         break;
+      }
+      final applyFile = themeCommand['apply-file'] as String?;
+      final applyUrl = themeCommand['apply-url'] as String?;
+      if (applyFile != null || applyUrl != null) {
+        if (!isExperimental) {
+          stderr.writeln('Error: --apply-file/--apply-url require --experimental.');
+          exit(1);
+        }
+        if (applyFile != null) {
+          await activeInstaller.applyThemeFromFile(applyFile);
+          break;
+        }
+        if (applyUrl != null) {
+          await activeInstaller.applyThemeFromUrl(applyUrl);
+          break;
+        }
       }
       final applyOption = themeCommand['apply'] as String?;
       final rest = themeCommand.rest;
       final presetArg = applyOption ?? (rest.isEmpty ? null : rest.first);
       if (presetArg != null) {
-        await installer!.applyThemeById(presetArg);
+        await activeInstaller.applyThemeById(presetArg);
         break;
       }
-      await installer!.chooseTheme();
+      await activeInstaller.chooseTheme();
       break;
     case 'add':
       final addCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
       if (addCommand['help'] == true) {
         print('Usage: flutter_shadcn add <component> [<component> ...]');
         print('       flutter_shadcn add --all');
@@ -211,10 +345,12 @@ Future<void> main(List<String> arguments) async {
       final rest = addCommand.rest;
       final addAll = addCommand['all'] == true || rest.contains('all');
       if (addAll) {
-        for (final component in registry!.components) {
-          await installer!.addComponent(component.id);
-        }
-        await installer!.generateAliases();
+        await activeInstaller.ensureInitFiles(allowPrompts: false);
+        await activeInstaller.runBulkInstall(() async {
+          await activeInstaller.addComponent('icon_fonts');
+          await activeInstaller.addComponent('typography_fonts');
+          await activeInstaller.installAllComponents();
+        });
         break;
       }
       if (rest.isEmpty) {
@@ -222,34 +358,137 @@ Future<void> main(List<String> arguments) async {
         print('       flutter_shadcn add --all');
         exit(1);
       }
-      for (final componentName in rest) {
-        await installer!.addComponent(componentName);
-      }
-      await installer!.generateAliases();
+      await activeInstaller.ensureInitFiles(allowPrompts: false);
+      await activeInstaller.runBulkInstall(() async {
+        for (final componentName in rest) {
+          await activeInstaller.addComponent(componentName);
+        }
+      });
       break;
     case 'remove':
       final removeCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
       if (removeCommand['help'] == true) {
         print('Usage: flutter_shadcn remove <component> [<component> ...]');
+        print('       flutter_shadcn remove --all');
         print('Options:');
+        print('  --all, -a          Remove every installed component');
         print('  --force, -f        Force removal even if dependencies remain');
         print('  --help, -h         Show this message');
         exit(0);
       }
       final rest = removeCommand.rest;
+      final removeAll = removeCommand['all'] == true || rest.contains('all');
+      if (removeAll) {
+        await activeInstaller.removeAllComponents(force: true);
+        break;
+      }
       if (rest.isEmpty) {
         print('Usage: flutter_shadcn remove <component>');
         exit(1);
       }
       final force = removeCommand['force'] == true;
       for (final componentName in rest) {
-        await installer!.removeComponent(componentName, force: force);
+        await activeInstaller.removeComponent(componentName, force: force);
       }
-      await installer!.generateAliases();
+      await activeInstaller.generateAliases();
       break;
     case 'doctor':
+      final doctorCommand = argResults.command!;
+      if (doctorCommand['help'] == true) {
+        print('Usage: flutter_shadcn doctor');
+        print('');
+        print('Diagnostics for registry resolution and environment.');
+        exit(0);
+      }
+      break;
+    case 'assets':
+      final assetsCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
+      if (assetsCommand['help'] == true) {
+        print('Usage: flutter_shadcn assets [options]');
+        print('');
+        print('Options:');
+        print('  --icons          Install icon font assets (Lucide/Radix/Bootstrap)');
+        print('  --typography     Install typography fonts (GeistSans/GeistMono)');
+        print('  --fonts          Alias for --typography');
+        print('  --list           List available assets');
+        print('  --all, -a        Install both icon + typography fonts');
+        print('  --help, -h       Show this message');
+        exit(0);
+      }
+
+      if (assetsCommand['list'] == true) {
+        print('Available assets:');
+        print('  icon_fonts       Lucide/Radix/Bootstrap icon fonts');
+        print('  typography_fonts GeistSans/GeistMono font families');
+        break;
+      }
+
+      final installAll = assetsCommand['all'] == true;
+      final installIcons = assetsCommand['icons'] == true;
+      final installTypography =
+          assetsCommand['typography'] == true || assetsCommand['fonts'] == true;
+      if (!installAll && !installIcons && !installTypography) {
+        print('Nothing selected. Use --icons, --typography, or --all.');
+        exit(1);
+      }
+
+      await activeInstaller.runBulkInstall(() async {
+        if (installAll || installIcons) {
+          await activeInstaller.addComponent('icon_fonts');
+        }
+        if (installAll || installTypography) {
+          await activeInstaller.addComponent('typography_fonts');
+        }
+      });
+      break;
+    case 'sync':
+      final syncCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
+      if (syncCommand['help'] == true) {
+        print('Usage: flutter_shadcn sync');
+        print('');
+        print('Re-applies .shadcn/config.json (paths, theme) to existing files.');
+        exit(0);
+      }
+      await activeInstaller.syncFromConfig();
       break;
   }
+}
+
+void _printUsage() {
+  print('Usage: flutter_shadcn <command> [arguments]');
+  print('Commands:');
+  print('  init    Initialize shadcn_flutter in the current project');
+  print('  theme   Manage registry theme presets');
+  print('  add     Add a widget');
+  print('  remove  Remove a widget');
+  print('  sync    Sync changes from .shadcn/config.json');
+  print('  assets  Install font/icon assets');
+  print('  doctor  Diagnose registry resolution');
+  print('');
+  print('Global flags:');
+  print('  --verbose        Verbose logging');
+  print('  --dev            Persist local registry for dev mode');
+  print('  --dev-path       Local registry path to persist for dev mode');
+  print('  --registry       auto|local|remote (default: auto)');
+  print('  --registry-path  Path to local registry folder');
+  print('  --registry-url   Remote registry base URL');
+  print('  --wip            Enable WIP features');
+  print('  --experimental   Enable experimental features');
 }
 
 void _ensureExecutablePath() {
@@ -296,6 +535,16 @@ Future<String?> _resolveRegistryRoot(String? cliRoot) async {
     }
   }
 
+  final kitFromCli = _findKitRegistryFromCliRoot(cliRoot);
+  if (kitFromCli != null) {
+    return kitFromCli;
+  }
+
+  final kitFromCwd = _findKitRegistryUpwards(Directory.current);
+  if (kitFromCwd != null) {
+    return kitFromCwd;
+  }
+
   final globalRegistry = _globalPackageRegistry();
   if (globalRegistry != null) {
     return globalRegistry;
@@ -310,6 +559,10 @@ Future<String?> _resolveRegistryRoot(String? cliRoot) async {
 
   final scriptPath = Platform.script.toFilePath();
   final scriptDir = Directory(p.dirname(scriptPath));
+  final kitFromScript = _findKitRegistryUpwards(scriptDir);
+  if (kitFromScript != null) {
+    return kitFromScript;
+  }
   final fromScript = _findRegistryUpwards(scriptDir);
   if (fromScript != null) {
     return fromScript;
@@ -320,6 +573,48 @@ Future<String?> _resolveRegistryRoot(String? cliRoot) async {
     return fromCwd;
   }
 
+  return null;
+}
+
+String? _findKitRegistryFromCliRoot(String? cliRoot) {
+  if (cliRoot == null) {
+    return null;
+  }
+  final parent = p.dirname(cliRoot);
+  final candidates = [
+    p.join(parent, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib', 'registry'),
+    p.join(parent, 'flutter_shadcn_kit', 'lib', 'registry'),
+    p.join(parent, 'shadcn_flutter_kit', 'lib', 'registry'),
+  ];
+  for (final candidate in candidates) {
+    final resolved = _validateRegistryRoot(candidate);
+    if (resolved != null) {
+      return resolved;
+    }
+  }
+  return null;
+}
+
+String? _findKitRegistryUpwards(Directory start) {
+  var current = start.absolute;
+  for (var i = 0; i < 8; i++) {
+    final candidates = [
+      p.join(current.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib', 'registry'),
+      p.join(current.path, 'flutter_shadcn_kit', 'lib', 'registry'),
+      p.join(current.path, 'shadcn_flutter_kit', 'lib', 'registry'),
+    ];
+    for (final candidate in candidates) {
+      final resolved = _validateRegistryRoot(candidate);
+      if (resolved != null) {
+        return resolved;
+      }
+    }
+    final parent = current.parent;
+    if (parent.path == current.path) {
+      break;
+    }
+    current = parent;
+  }
   return null;
 }
 
@@ -409,11 +704,13 @@ RegistrySelection _resolveRegistrySelection(
   final urlOverride = (args?['registry-url'] as String?) ?? config.registryUrl;
 
   if (mode == 'local' || mode == 'auto') {
-    final localRoot = _resolveLocalRoot(
+    var localRoot = _resolveLocalRoot(
       pathOverride,
       roots.localRegistryRoot,
       config.registryPath,
     );
+    localRoot ??= _findKitRegistryUpwards(Directory.current);
+    localRoot ??= _findKitRegistryFromCliRoot(roots.cliRoot);
     if (localRoot != null) {
       final sourceRoot = p.dirname(localRoot);
       return RegistrySelection(
