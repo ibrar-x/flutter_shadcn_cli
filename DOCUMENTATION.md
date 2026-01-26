@@ -10,6 +10,9 @@
 - **Manifest**: `<installPath>/components.json` records installed components.
 - **State**: `.shadcn/state.json` tracks managed dependencies and sync metadata.
 
+Registry components live at:
+https://github.com/ibrar-x/shadcn_flutter_kit/flutter_shadcn_kit/lib
+
 ## Architecture
 
 ### Core Modules
