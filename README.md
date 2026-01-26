@@ -258,6 +258,25 @@ Example JSON structure:
 
 - [theme_example.json](theme_example.json)
 
+```json
+{
+	"id": "custom",
+	"name": "Custom Theme",
+	"light": {
+		"background": "#FFFFFF",
+		"foreground": "#09090B",
+		"primary": "#1447E6",
+		"primaryForeground": "#EFF6FF"
+	},
+	"dark": {
+		"background": "#09090B",
+		"foreground": "#FAFAFA",
+		"primary": "#2B7FFF",
+		"primaryForeground": "#EFF6FF"
+	}
+}
+```
+
 Apply a custom theme JSON URL (experimental):
 
 ```bash
