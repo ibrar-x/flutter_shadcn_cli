@@ -1,6 +1,6 @@
 name: flutter_shadcn_cli
 description: CLI for the shadcn_flutter registry.
-version: 0.1.2
+version: 0.1.5
 repository: https://github.com/ibrar-x/flutter_shadcn_cli
 homepage: https://github.com/ibrar-x/flutter_shadcn_cli
 

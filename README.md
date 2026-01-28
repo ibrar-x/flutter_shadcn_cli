@@ -232,6 +232,21 @@ flutter_shadcn assets --fonts
 flutter_shadcn assets --all
 ```
 
+### platform
+
+```bash
+flutter_shadcn platform --list
+```
+
+```bash
+flutter_shadcn platform --set ios.infoPlist=ios/Runner/Info.plist \
+	--set android.gradle=android/app/build.gradle
+```
+
+```bash
+flutter_shadcn platform --reset ios.infoPlist
+```
+
 ### remove
 
 ```bash
@@ -296,6 +311,8 @@ Use `sync` after editing .shadcn/config.json to move paths and re-apply the them
 ```bash
 flutter_shadcn doctor
 ```
+
+Doctor also reports resolved platform targets (defaults + overrides).
 
 ## Folder Path Aliases
 
@@ -378,6 +395,7 @@ If aliases are missing:
 - Init flags for installing icons/fonts on demand.
 - Dependency updates are batched for faster installs/removals.
 - remove --all cleans empty parent folders after deleting files.
+- Platform targets can be configured via the platform command.
 
 ## CLI Acknowledgements
 

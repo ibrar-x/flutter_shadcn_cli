@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+- Add file-level dependsOn support for component/shared files.
+- Apply platform-specific instructions with configurable targets.
+- Add platform command to set/reset target overrides.
+- Report post-install notes for components.
+- Prettify CLI output with colors and sections.
+
 ## 0.1.4
 
 - Experimental theme install from JSON file/URL (gated by --experimental).
