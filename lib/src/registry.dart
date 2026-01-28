@@ -105,9 +105,9 @@ class SharedItem {
 
   SharedItem.fromJson(Map<String, dynamic> json)
       : id = json['id'],
-        files = (json['files'] as List)
-            .map((e) => RegistryFile.fromJson(e))
-            .toList();
+      files = (json['files'] as List)
+        .map((e) => RegistryFile.fromJson(e))
+        .toList();
 }
 
 class Component {
@@ -120,6 +120,8 @@ class Component {
   final List<String> assets;
   final List<FontEntry> fonts;
   final Map<String, dynamic> pubspec;
+  final List<String> postInstall;
+  final Map<String, PlatformEntry> platform;
 
   Component.fromJson(Map<String, dynamic> json)
       : id = json['id'],
@@ -134,16 +136,93 @@ class Component {
         fonts = (json['fonts'] as List<dynamic>? ?? const [])
             .map((e) => FontEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
-        pubspec = json['pubspec'] ?? {};
+      pubspec = json['pubspec'] ?? {},
+      postInstall = List<String>.from(json['postInstall'] ?? []),
+      platform = (json['platform'] as Map<String, dynamic>? ?? const {})
+        .map((key, value) => MapEntry(
+            key,
+            PlatformEntry.fromJson(value as Map<String, dynamic>),
+          ));
 }
 
 class RegistryFile {
   final String source;
   final String destination;
+  final List<FileDependency> dependsOn;
 
-  RegistryFile.fromJson(Map<String, dynamic> json)
-      : source = json['source'],
-        destination = json['destination'];
+  RegistryFile({
+    required this.source,
+    required this.destination,
+    this.dependsOn = const [],
+  });
+
+  factory RegistryFile.fromJson(dynamic json) {
+    if (json is String) {
+      return RegistryFile(source: json, destination: json);
+    }
+    final map = json as Map<String, dynamic>;
+    final deps = (map['dependsOn'] as List<dynamic>? ?? const [])
+        .map((e) => FileDependency.fromJson(e))
+        .toList();
+    return RegistryFile(
+      source: map['source'] as String,
+      destination: map['destination'] as String,
+      dependsOn: deps,
+    );
+  }
+}
+
+class FileDependency {
+  final String source;
+  final bool optional;
+
+  const FileDependency({required this.source, this.optional = false});
+
+  factory FileDependency.fromJson(dynamic json) {
+    if (json is String) {
+      return FileDependency(source: json);
+    }
+    final map = json as Map<String, dynamic>;
+    return FileDependency(
+      source: map['source'] as String,
+      optional: map['optional'] as bool? ?? false,
+    );
+  }
+}
+
+class PlatformEntry {
+  final List<String> permissions;
+  final Map<String, String> infoPlist;
+  final List<String> entitlements;
+  final List<String> podfile;
+  final List<String> gradle;
+  final List<String> config;
+  final List<String> notes;
+
+  PlatformEntry({
+    this.permissions = const [],
+    this.infoPlist = const {},
+    this.entitlements = const [],
+    this.podfile = const [],
+    this.gradle = const [],
+    this.config = const [],
+    this.notes = const [],
+  });
+
+  factory PlatformEntry.fromJson(Map<String, dynamic> json) {
+    return PlatformEntry(
+      permissions: List<String>.from(json['permissions'] ?? const []),
+      infoPlist: (json['infoPlist'] as Map?)?.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          ) ??
+          const {},
+      entitlements: List<String>.from(json['entitlements'] ?? const []),
+      podfile: List<String>.from(json['podfile'] ?? const []),
+      gradle: List<String>.from(json['gradle'] ?? const []),
+      config: List<String>.from(json['config'] ?? const []),
+      notes: List<String>.from(json['notes'] ?? const []),
+    );
+  }
 }
 
 class FontEntry {

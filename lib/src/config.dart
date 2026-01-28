@@ -15,6 +15,7 @@ class ShadcnConfig {
   final bool? includeMeta;
   final bool? includePreview;
   final Map<String, String>? pathAliases;
+  final Map<String, Map<String, String>>? platformTargets;
 
   const ShadcnConfig({
     this.classPrefix,
@@ -28,6 +29,7 @@ class ShadcnConfig {
     this.includeMeta,
     this.includePreview,
     this.pathAliases,
+    this.platformTargets,
   });
 
   factory ShadcnConfig.fromJson(Map<String, dynamic> json) {
@@ -45,6 +47,15 @@ class ShadcnConfig {
       pathAliases: (json['pathAliases'] as Map?)?.map(
         (key, value) => MapEntry(key.toString(), value.toString()),
       ),
+      platformTargets: (json['platformTargets'] as Map?)?.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          (value as Map).map(
+            (innerKey, innerValue) =>
+                MapEntry(innerKey.toString(), innerValue.toString()),
+          ),
+        ),
+      ),
     );
   }
 
@@ -61,6 +72,7 @@ class ShadcnConfig {
       'includeMeta': includeMeta,
       'includePreview': includePreview,
       'pathAliases': pathAliases,
+      'platformTargets': platformTargets,
     };
   }
 
@@ -102,6 +114,7 @@ class ShadcnConfig {
     bool? includeMeta,
     bool? includePreview,
     Map<String, String>? pathAliases,
+    Map<String, Map<String, String>>? platformTargets,
   }) {
     return ShadcnConfig(
       classPrefix: classPrefix ?? this.classPrefix,
@@ -115,6 +128,7 @@ class ShadcnConfig {
       includeMeta: includeMeta ?? this.includeMeta,
       includePreview: includePreview ?? this.includePreview,
       pathAliases: pathAliases ?? this.pathAliases,
+      platformTargets: platformTargets ?? this.platformTargets,
     );
   }
 }

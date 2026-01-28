@@ -31,7 +31,7 @@ class Installer {
     required this.registry,
     required this.targetDir,
     CliLogger? logger,
-  }) : logger = logger ?? const CliLogger();
+  }) : logger = logger ?? CliLogger();
 
   Future<void> init({
     bool skipPrompts = false,
@@ -147,8 +147,11 @@ class Installer {
 
       // 3. Install component files
       for (final file in component.files) {
-        await _installComponentFile(component, file);
+        await _installComponentFile(component, file, component.files);
       }
+
+      // 3b. Apply platform instructions (if any)
+      await _applyPlatformInstructions(component);
 
       // 4. Update pubspec (print instructions for now, or use dcli/automator)
       if (component.pubspec.isNotEmpty) {
@@ -160,6 +163,9 @@ class Installer {
       }
       if (component.fonts.isNotEmpty) {
         await _queueFontUpdates(component.fonts);
+      }
+      if (component.postInstall.isNotEmpty) {
+        _reportPostInstall(component);
       }
       if (!_deferAliases) {
         await generateAliases();
@@ -239,7 +245,7 @@ class Installer {
     _installingSharedIds.add(resolvedId);
     try {
       for (final file in sharedItem.files) {
-        await _installFile(file);
+        await _installFileWithDependencies(file, sharedItem.files);
       }
 
       _installedSharedCache.add(resolvedId);
@@ -595,14 +601,96 @@ class Installer {
     await destFile.writeAsBytes(bytes, flush: true);
   }
 
-  Future<void> _installComponentFile(Component component, RegistryFile file) async {
+  Future<void> _installComponentFile(
+    Component component,
+    RegistryFile file,
+    List<RegistryFile> availableFiles,
+  ) async {
     await _ensureConfigLoaded();
+    await _installFileDependencies(component, file, availableFiles);
     final destination = _resolveComponentDestination(component, file);
-    final patched = RegistryFile.fromJson({
-      'source': file.source,
-      'destination': destination,
-    });
+    final patched = RegistryFile(
+      source: file.source,
+      destination: destination,
+      dependsOn: file.dependsOn,
+    );
     await _installFile(patched);
+  }
+
+  Future<void> _installFileWithDependencies(
+    RegistryFile file,
+    List<RegistryFile> availableFiles,
+  ) async {
+    await _ensureConfigLoaded();
+    await _installSharedFileDependencies(file, availableFiles);
+    await _installFile(file);
+  }
+
+  Future<void> _installFileDependencies(
+    Component component,
+    RegistryFile file,
+    List<RegistryFile> availableFiles,
+  ) async {
+    if (file.dependsOn.isEmpty) {
+      return;
+    }
+    for (final dep in file.dependsOn) {
+      final mapping = _findFileMapping(availableFiles, dep.source) ??
+          RegistryFile(source: dep.source, destination: dep.source);
+      final destination = _resolveComponentDestination(component, mapping);
+      final target = File(destination);
+      if (await target.exists()) {
+        continue;
+      }
+      if (!await _safeInstallDependency(component, mapping, availableFiles)) {
+        if (!dep.optional) {
+          logger.warn('Missing dependency file: ${dep.source}');
+        }
+      }
+    }
+  }
+
+  Future<void> _installSharedFileDependencies(
+    RegistryFile file,
+    List<RegistryFile> availableFiles,
+  ) async {
+    if (file.dependsOn.isEmpty) {
+      return;
+    }
+    for (final dep in file.dependsOn) {
+      final mapping = _findFileMapping(availableFiles, dep.source) ??
+          RegistryFile(source: dep.source, destination: dep.source);
+      final target = File(_resolveDestinationPath(mapping.destination));
+      if (await target.exists()) {
+        continue;
+      }
+      await _installFile(mapping);
+    }
+  }
+
+  Future<bool> _safeInstallDependency(
+    Component component,
+    RegistryFile mapping,
+    List<RegistryFile> availableFiles,
+  ) async {
+    try {
+      await _installComponentFile(component, mapping, availableFiles);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  RegistryFile? _findFileMapping(
+    List<RegistryFile> availableFiles,
+    String source,
+  ) {
+    for (final file in availableFiles) {
+      if (file.source == source) {
+        return file;
+      }
+    }
+    return null;
   }
 
   String _resolveComponentDestination(Component component, RegistryFile file) {
@@ -617,6 +705,166 @@ class Installer {
     }
 
     return _resolveDestinationPath(file.destination);
+  }
+
+  Map<String, Map<String, String>> _platformTargets(ShadcnConfig? config) {
+    final defaults = <String, Map<String, String>>{
+      'android': {
+        'permissions': 'android/app/src/main/AndroidManifest.xml',
+        'gradle': 'android/app/build.gradle',
+        'notes': '.shadcn/platform/android.md',
+      },
+      'ios': {
+        'infoPlist': 'ios/Runner/Info.plist',
+        'podfile': 'ios/Podfile',
+        'notes': '.shadcn/platform/ios.md',
+      },
+      'macos': {
+        'entitlements': 'macos/Runner/DebugProfile.entitlements',
+        'notes': '.shadcn/platform/macos.md',
+      },
+      'desktop': {
+        'config': '.shadcn/platform/desktop.md',
+      },
+    };
+    final overrides = config?.platformTargets ?? const {};
+    final merged = <String, Map<String, String>>{};
+    for (final entry in defaults.entries) {
+      merged[entry.key] = Map<String, String>.from(entry.value);
+    }
+    overrides.forEach((platform, value) {
+      merged.putIfAbsent(platform, () => {});
+      merged[platform]!.addAll(value);
+    });
+    return merged;
+  }
+
+  Future<void> _applyPlatformInstructions(Component component) async {
+    if (component.platform.isEmpty) {
+      return;
+    }
+    await _ensureConfigLoaded();
+    final targets = _platformTargets(_cachedConfig);
+    for (final entry in component.platform.entries) {
+      final platform = entry.key;
+      final instructions = entry.value;
+      final platformTargets = targets[platform] ?? const {};
+
+      await _writePlatformSection(
+        platform: platform,
+        section: 'permissions',
+        targetPath: platformTargets['permissions'],
+        lines: instructions.permissions,
+      );
+      await _writePlatformSection(
+        platform: platform,
+        section: 'gradle',
+        targetPath: platformTargets['gradle'],
+        lines: instructions.gradle,
+      );
+      await _writePlatformSection(
+        platform: platform,
+        section: 'podfile',
+        targetPath: platformTargets['podfile'],
+        lines: instructions.podfile,
+      );
+      await _writePlatformSection(
+        platform: platform,
+        section: 'entitlements',
+        targetPath: platformTargets['entitlements'],
+        lines: instructions.entitlements,
+      );
+      await _writePlatformSection(
+        platform: platform,
+        section: 'config',
+        targetPath: platformTargets['config'],
+        lines: instructions.config,
+      );
+      await _writePlatformSection(
+        platform: platform,
+        section: 'notes',
+        targetPath: platformTargets['notes'],
+        lines: instructions.notes,
+      );
+
+      if (instructions.infoPlist.isNotEmpty) {
+        final plistLines = instructions.infoPlist.entries
+            .map((e) => '${e.key}: ${e.value}')
+            .toList();
+        await _writePlatformSection(
+          platform: platform,
+          section: 'infoPlist',
+          targetPath: platformTargets['infoPlist'],
+          lines: plistLines,
+        );
+      }
+    }
+  }
+
+  Future<void> _writePlatformSection({
+    required String platform,
+    required String section,
+    required String? targetPath,
+    required List<String> lines,
+  }) async {
+    if (lines.isEmpty) {
+      return;
+    }
+    if (targetPath == null || targetPath.isEmpty) {
+      logger.detail('No target configured for $platform/$section.');
+      return;
+    }
+    final fullPath = p.join(targetDir, targetPath);
+    final file = File(fullPath);
+    if (!await file.parent.exists()) {
+      await file.parent.create(recursive: true);
+    }
+    final marker = 'shadcn_flutter_cli:$platform:$section';
+    final existing = await file.exists() ? await file.readAsString() : '';
+    if (existing.contains(marker)) {
+      return;
+    }
+    final block = _formatPlatformBlock(fullPath, marker, lines);
+    await file.writeAsString(existing + block);
+    logger.detail('Updated $targetPath ($platform/$section)');
+  }
+
+  String _formatPlatformBlock(String path, String marker, List<String> lines) {
+    final ext = p.extension(path).toLowerCase();
+    final isXml = ext == '.xml' || ext == '.plist' || ext == '.entitlements';
+    final isMd = ext == '.md';
+    if (isXml) {
+      final buffer = StringBuffer();
+      buffer.writeln('\n<!-- $marker:start -->');
+      for (final line in lines) {
+        buffer.writeln('<!-- $line -->');
+      }
+      buffer.writeln('<!-- $marker:end -->\n');
+      return buffer.toString();
+    }
+    if (isMd) {
+      final buffer = StringBuffer();
+      buffer.writeln('\n## $marker');
+      for (final line in lines) {
+        buffer.writeln('- $line');
+      }
+      buffer.writeln('');
+      return buffer.toString();
+    }
+    final buffer = StringBuffer();
+    buffer.writeln('\n// $marker:start');
+    for (final line in lines) {
+      buffer.writeln('// $line');
+    }
+    buffer.writeln('// $marker:end\n');
+    return buffer.toString();
+  }
+
+  void _reportPostInstall(Component component) {
+    logger.section('Post-install notes for ${component.name}');
+    for (final line in component.postInstall) {
+      logger.info('  • $line');
+    }
   }
 
   Future<void> generateAliases() async {

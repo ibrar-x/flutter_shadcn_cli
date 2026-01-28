@@ -91,6 +91,20 @@ Future<void> main(List<String> arguments) async {
         ..addFlag('list', negatable: false, help: 'List available assets')
         ..addFlag('all', abbr: 'a', negatable: false)
         ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'platform',
+      ArgParser()
+        ..addMultiOption(
+          'set',
+          help: 'Set platform target path (platform.section=path)',
+        )
+        ..addMultiOption(
+          'reset',
+          help: 'Remove platform target override (platform.section)',
+        )
+        ..addFlag('list', negatable: false, help: 'List platform targets')
+        ..addFlag('help', abbr: 'h', negatable: false),
     );
 
   ArgResults argResults;
@@ -451,6 +465,34 @@ Future<void> main(List<String> arguments) async {
         }
       });
       break;
+    case 'platform':
+      final platformCommand = argResults.command!;
+      if (platformCommand['help'] == true) {
+        print('Usage: flutter_shadcn platform [--list | --set <p.s=path> | --reset <p.s>]');
+        print('');
+        print('Options:');
+        print('  --list             List platform targets');
+        print('  --set              Set override (repeatable), e.g. ios.infoPlist=ios/Runner/Info.plist');
+        print('  --reset            Remove override (repeatable), e.g. ios.infoPlist');
+        print('  --help, -h         Show this message');
+        exit(0);
+      }
+      final sets = (platformCommand['set'] as List).cast<String>();
+      final resets = (platformCommand['reset'] as List).cast<String>();
+      final list = platformCommand['list'] == true;
+      if (sets.isEmpty && resets.isEmpty && !list) {
+        print('Nothing selected. Use --list, --set, or --reset.');
+        exit(1);
+      }
+
+      final updated = _updatePlatformTargets(config, sets, resets);
+      if (updated != null) {
+        config = updated;
+        await ShadcnConfig.save(targetDir, config);
+      }
+      final targets = _mergePlatformTargets(config.platformTargets);
+      _printPlatformTargets(targets);
+      break;
     case 'sync':
       final syncCommand = argResults.command!;
       final activeInstaller = installer;
@@ -478,6 +520,7 @@ void _printUsage() {
   print('  remove  Remove a widget');
   print('  sync    Sync changes from .shadcn/config.json');
   print('  assets  Install font/icon assets');
+  print('  platform Configure platform targets');
   print('  doctor  Diagnose registry resolution');
   print('');
   print('Global flags:');
@@ -664,24 +707,138 @@ String? _findRegistryUpwards(Directory start) {
 }
 
 void _runDoctor(ResolvedRoots roots, ArgResults args, ShadcnConfig config) {
+  final logger = CliLogger(verbose: args['verbose'] == true);
   final selection = _resolveRegistrySelection(args, roots, config);
   final envRoot = Platform.environment['SHADCN_REGISTRY_ROOT'];
   final envUrl = Platform.environment['SHADCN_REGISTRY_URL'];
   final pubCache = Platform.environment['PUB_CACHE'] ??
       p.join(Platform.environment['HOME'] ?? '', '.pub-cache');
-  stdout.writeln('flutter_shadcn doctor');
-  stdout.writeln('  script: ${Platform.script.toFilePath()}');
-  stdout.writeln('  cwd: ${Directory.current.path}');
-  stdout.writeln('  SHADCN_REGISTRY_ROOT: ${envRoot ?? '(unset)'}');
-  stdout.writeln('  SHADCN_REGISTRY_URL: ${envUrl ?? '(unset)'}');
-  stdout.writeln('  PUB_CACHE: $pubCache');
-  stdout.writeln('  cliRoot: ${roots.cliRoot ?? '(unresolved)'}');
-  stdout.writeln('  localRegistryRoot: ${roots.localRegistryRoot ?? '(unresolved)'}');
-  stdout.writeln('  config.registryMode: ${config.registryMode ?? '(unset)'}');
-  stdout.writeln('  config.registryPath: ${config.registryPath ?? '(unset)'}');
-  stdout.writeln('  config.registryUrl: ${config.registryUrl ?? '(unset)'}');
-  stdout.writeln('  registryMode: ${selection.mode}');
-  stdout.writeln('  registryRoot: ${selection.registryRoot.root}');
+  logger.header('flutter_shadcn doctor');
+  logger.info('  script: ${Platform.script.toFilePath()}');
+  logger.info('  cwd: ${Directory.current.path}');
+  logger.info('  SHADCN_REGISTRY_ROOT: ${envRoot ?? '(unset)'}');
+  logger.info('  SHADCN_REGISTRY_URL: ${envUrl ?? '(unset)'}');
+  logger.info('  PUB_CACHE: $pubCache');
+  logger.info('  cliRoot: ${roots.cliRoot ?? '(unresolved)'}');
+  logger.info('  localRegistryRoot: ${roots.localRegistryRoot ?? '(unresolved)'}');
+  logger.info('  config.registryMode: ${config.registryMode ?? '(unset)'}');
+  logger.info('  config.registryPath: ${config.registryPath ?? '(unset)'}');
+  logger.info('  config.registryUrl: ${config.registryUrl ?? '(unset)'}');
+  logger.info('  registryMode: ${selection.mode}');
+  logger.info('  registryRoot: ${selection.registryRoot.root}');
+
+  final platformTargets = _mergePlatformTargets(config.platformTargets);
+  logger.section('Platform targets');
+  logger.info('  (set .shadcn/config.json "platformTargets" to override paths)');
+  platformTargets.forEach((platform, targets) {
+    logger.info('  $platform:');
+    for (final entry in targets.entries) {
+      logger.info('    ${entry.key}: ${entry.value}');
+    }
+  });
+}
+
+Map<String, Map<String, String>> _mergePlatformTargets(
+  Map<String, Map<String, String>>? overrides,
+) {
+  final defaults = <String, Map<String, String>>{
+    'android': {
+      'permissions': 'android/app/src/main/AndroidManifest.xml',
+      'gradle': 'android/app/build.gradle',
+      'notes': '.shadcn/platform/android.md',
+    },
+    'ios': {
+      'infoPlist': 'ios/Runner/Info.plist',
+      'podfile': 'ios/Podfile',
+      'notes': '.shadcn/platform/ios.md',
+    },
+    'macos': {
+      'entitlements': 'macos/Runner/DebugProfile.entitlements',
+      'notes': '.shadcn/platform/macos.md',
+    },
+    'desktop': {
+      'config': '.shadcn/platform/desktop.md',
+    },
+  };
+  final merged = <String, Map<String, String>>{};
+  for (final entry in defaults.entries) {
+    merged[entry.key] = Map<String, String>.from(entry.value);
+  }
+  if (overrides != null) {
+    overrides.forEach((platform, value) {
+      merged.putIfAbsent(platform, () => {});
+      merged[platform]!.addAll(value);
+    });
+  }
+  return merged;
+}
+
+ShadcnConfig? _updatePlatformTargets(
+  ShadcnConfig config,
+  List<String> sets,
+  List<String> resets,
+) {
+  if (sets.isEmpty && resets.isEmpty) {
+    return null;
+  }
+  final current = config.platformTargets == null
+      ? <String, Map<String, String>>{}
+      : Map<String, Map<String, String>>.fromEntries(
+          config.platformTargets!.entries.map(
+            (entry) => MapEntry(entry.key, Map<String, String>.from(entry.value)),
+          ),
+        );
+
+  for (final reset in resets) {
+    final parts = reset.split('.');
+    if (parts.length != 2) {
+      stderr.writeln('Invalid reset format: $reset (use platform.section)');
+      continue;
+    }
+    final platform = parts[0];
+    final section = parts[1];
+    final sectionMap = current[platform];
+    sectionMap?.remove(section);
+    if (sectionMap != null && sectionMap.isEmpty) {
+      current.remove(platform);
+    }
+  }
+
+  for (final set in sets) {
+    final parts = set.split('=');
+    if (parts.length != 2) {
+      stderr.writeln('Invalid set format: $set (use platform.section=path)');
+      continue;
+    }
+    final key = parts[0];
+    final value = parts[1];
+    final keyParts = key.split('.');
+    if (keyParts.length != 2) {
+      stderr.writeln('Invalid set key: $key (use platform.section)');
+      continue;
+    }
+    final platform = keyParts[0];
+    final section = keyParts[1];
+    current.putIfAbsent(platform, () => {});
+    current[platform]![section] = value;
+  }
+
+  return config.copyWith(platformTargets: current);
+}
+
+void _printPlatformTargets(Map<String, Map<String, String>> targets) {
+  final logger = CliLogger();
+  logger.section('Platform targets');
+  if (targets.isEmpty) {
+    logger.info('  (no targets configured)');
+    return;
+  }
+  targets.forEach((platform, sections) {
+    logger.info('  $platform:');
+    for (final entry in sections.entries) {
+      logger.info('    ${entry.key}: ${entry.value}');
+    }
+  });
 }
 
 class ResolvedRoots {

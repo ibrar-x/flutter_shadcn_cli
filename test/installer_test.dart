@@ -49,7 +49,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -91,7 +91,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -127,7 +127,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -163,7 +163,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -203,7 +203,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -233,7 +233,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -269,7 +269,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -320,7 +320,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -359,7 +359,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -388,7 +388,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-        logger: const CliLogger(),
+          logger: CliLogger(),
       );
 
       await installer.init(
