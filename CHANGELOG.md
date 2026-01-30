@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- Add Dartdoc for public APIs and export preset theme data.
+- Add CLI example script for pub.dev package validation.
+- Update dependency constraints to latest compatible versions.
+- Refresh pubspec description and project links.
+
 ## 0.1.5
 
 - Add file-level dependsOn support for component/shared files.
