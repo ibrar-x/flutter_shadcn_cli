@@ -1,12 +1,33 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND.
 // Derived from registry/shared/theme/preset_themes.dart for CLI use.
 
+/// Theme preset data containing color tokens for light and dark modes.
+///
+/// Each preset defines a complete color palette that can be applied to
+/// shadcn_flutter components. The [light] and [dark] maps contain hex
+/// color values (ARGB format) for each design token.
+///
+/// Example:
+/// ```dart
+/// final blueTheme = registryThemePresetsData.firstWhere(
+///   (preset) => preset.id == 'blue',
+/// );
+/// print(blueTheme.light['primary']); // FF1447E6
+/// ```
 class RegistryThemePresetData {
+  /// Unique identifier for the theme preset (e.g., 'blue', 'green').
   final String id;
+
+  /// Human-readable name for the theme (e.g., 'Blue', 'Green').
   final String name;
+
+  /// Color tokens for light mode as hex strings (ARGB format).
   final Map<String, String> light;
+
+  /// Color tokens for dark mode as hex strings (ARGB format).
   final Map<String, String> dark;
 
+  /// Creates a theme preset with the given [id], [name], and color maps.
   const RegistryThemePresetData({
     required this.id,
     required this.name,
@@ -15,6 +36,10 @@ class RegistryThemePresetData {
   });
 }
 
+/// All available theme presets for shadcn_flutter components.
+///
+/// Each preset contains a complete light and dark color palette.
+/// Use these presets during `flutter_shadcn init` to select a theme.
 const List<RegistryThemePresetData> registryThemePresetsData = [
   RegistryThemePresetData(
     id: 'blue',
