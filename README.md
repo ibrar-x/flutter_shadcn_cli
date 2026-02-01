@@ -74,7 +74,7 @@ flutter_shadcn init --yes \
 	--include-readme=false \
 	--include-preview=false \
 	--prefix App \
-	--theme new-york \
+	--theme modern-minimal \
 	--alias ui=ui
 ```
 
@@ -216,7 +216,7 @@ flutter_shadcn init --yes \
 	--include-readme=false \
 	--include-preview=false \
 	--prefix App \
-	--theme new-york \
+	--theme modern-minimal \
 	--alias ui=ui
 ```
 

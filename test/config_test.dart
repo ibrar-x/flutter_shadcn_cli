@@ -16,7 +16,7 @@ void main() {
 
     const config = ShadcnConfig(
       classPrefix: 'App',
-      themeId: 'new-york',
+      themeId: 'modern-minimal',
       registryMode: 'local',
       registryPath: '/tmp/registry',
       registryUrl: 'https://example.com',

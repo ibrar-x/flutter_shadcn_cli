@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.7
+
+- **BREAKING**: Complete theme preset overhaul with 42 new modern themes.
+- New theme presets: amber-minimal, amethyst-haze, bold-tech, bubblegum, caffeine, candyland, catppuccin, claude, claymorphism, clean-slate, cosmic-night, cyberpunk, darkmatter, doom-64, elegant-luxury, graphite, kodama-grove, midnight-bloom, mocha-mousse, modern-minimal, mono, nature, neo-brutalism, northern-lights, notebook, ocean-breeze, pastel-dreams, perpetuity, quantum-rose, retro-arcade, sage-garden, soft-pop, solar-dusk, starry-night, sunset-horizon, supabase, t3-chat, tangerine, twitter, vercel, vintage-paper, violet-bloom.
+- Fix repository URL in pubspec.yaml for pub.dev validation.
+- Follow Dart file conventions for better code organization.
+- Remove all previous theme presets in favor of new collection.
+
 ## 0.1.6
 
 - Add Dartdoc for public APIs and export preset theme data.

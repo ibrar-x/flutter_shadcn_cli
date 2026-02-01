@@ -26,6 +26,5 @@
 ///
 /// See the [README](https://pub.dev/packages/flutter_shadcn_cli) for full
 /// documentation.
-library flutter_shadcn_cli;
-
+// ignore_for_file: dangling_library_doc_comments
 export 'registry/shared/theme/preset_theme_data.dart';

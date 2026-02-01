@@ -2,6 +2,7 @@
 ///
 /// This CLI is designed to be run from the command line, not imported
 /// as a library. Below are the common commands you'll use.
+// ignore_for_file: dangling_library_doc_comments
 ///
 /// ## Installation
 ///
@@ -56,8 +57,6 @@
 /// ## Using theme presets programmatically
 ///
 /// If you need to access theme data in your code:
-library example;
-
 import 'package:flutter_shadcn_cli/flutter_shadcn_cli.dart';
 
 void main() {
