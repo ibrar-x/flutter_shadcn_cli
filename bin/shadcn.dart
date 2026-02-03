@@ -6,6 +6,8 @@ import 'package:flutter_shadcn_cli/src/installer.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/registry.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
+import 'package:flutter_shadcn_cli/src/discovery_commands.dart';
+import 'package:flutter_shadcn_cli/src/skill_manager.dart';
 
 Future<void> main(List<String> arguments) async {
   _ensureExecutablePath();
@@ -104,6 +106,34 @@ Future<void> main(List<String> arguments) async {
           help: 'Remove platform target override (platform.section)',
         )
         ..addFlag('list', negatable: false, help: 'List platform targets')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'list',
+      ArgParser()
+        ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'search',
+      ArgParser()
+        ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'info',
+      ArgParser()
+        ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'install-skill',
+      ArgParser()
+        ..addOption('skill', abbr: 's', help: 'Skill id to install')
+        ..addOption('model', abbr: 'm', help: 'Model name (e.g., gpt-4)')
+        ..addFlag('symlink', negatable: false, help: 'Symlink shared skill to model')
+        ..addFlag('list', negatable: false, help: 'List installed skills')
+        ..addOption('uninstall', help: 'Uninstall skill')
         ..addFlag('help', abbr: 'h', negatable: false),
     );
 
@@ -508,20 +538,216 @@ Future<void> main(List<String> arguments) async {
       }
       await activeInstaller.syncFromConfig();
       break;
+    case 'list':
+      final listCommand = argResults.command!;
+      if (listCommand['help'] == true) {
+        print('Usage: flutter_shadcn list [--refresh]');
+        print('');
+        print('Lists all available components from the registry.');
+        print('Options:');
+        print('  --refresh  Refresh cache from remote');
+        exit(0);
+      }
+      final registryUrl = _resolveRegistryUrl(roots, config);
+      await handleListCommand(
+        registryBaseUrl: registryUrl,
+        registryId: 'default',
+        refresh: listCommand['refresh'] == true,
+        logger: logger,
+      );
+      break;
+    case 'search':
+      final searchCommand = argResults.command!;
+      if (searchCommand['help'] == true) {
+        print('Usage: flutter_shadcn search <query> [--refresh]');
+        print('');
+        print('Searches for components by name, description, or tags.');
+        print('Options:');
+        print('  --refresh  Refresh cache from remote');
+        exit(0);
+      }
+      final searchQuery = searchCommand.rest.join(' ');
+      if (searchQuery.isEmpty) {
+        print('Usage: flutter_shadcn search <query>');
+        exit(1);
+      }
+      final registryUrl = _resolveRegistryUrl(roots, config);
+      await handleSearchCommand(
+        query: searchQuery,
+        registryBaseUrl: registryUrl,
+        registryId: 'default',
+        refresh: searchCommand['refresh'] == true,
+        logger: logger,
+      );
+      break;
+    case 'info':
+      final infoCommand = argResults.command!;
+      if (infoCommand['help'] == true) {
+        print('Usage: flutter_shadcn info <component-id> [--refresh]');
+        print('');
+        print('Shows detailed information about a component.');
+        print('Options:');
+        print('  --refresh  Refresh cache from remote');
+        exit(0);
+      }
+      final componentId = infoCommand.rest.isNotEmpty ? infoCommand.rest.first : '';
+      if (componentId.isEmpty) {
+        print('Usage: flutter_shadcn info <component-id>');
+        exit(1);
+      }
+      final registryUrl = _resolveRegistryUrl(roots, config);
+      await handleInfoCommand(
+        componentId: componentId,
+        registryBaseUrl: registryUrl,
+        registryId: 'default',
+        refresh: infoCommand['refresh'] == true,
+        logger: logger,
+      );
+      break;
+    case 'install-skill':
+      final skillCommand = argResults.command!;
+      if (skillCommand['help'] == true) {
+        print('Usage: flutter_shadcn install-skill [--skill <id>] [--model <name>] [options]');
+        print('');
+        print('Manages AI skills for model-specific installations.');
+        print('Discovers hidden AI model folders (.claude, .gpt4, .cursor, etc.) in project root.');
+        print('');
+        print('Modes:');
+        print('  (no args)              Interactive mode: prompts for skill ID and shows model menu');
+        print('  --list                 List all installed skills grouped by model');
+        print('  --skill <id>           Install skill (opens interactive model menu if no --model)');
+        print('  --skill <id> --model   Install skill to specific model folder');
+        print('  --symlink --model      Create symlinks from source model to other models');
+        print('  --uninstall <id>       Remove skill from specific model (requires --model)');
+        print('');
+        print('Interactive Installation Flow:');
+        print('  1. Discovers all .{model}/ folders (.claude, .gpt4, .cursor, etc.)');
+        print('  2. Shows numbered menu: select 1-N models or "all"');
+        print('  3. For "all": choose mode:');
+        print('     - Copy skill to each model folder');
+        print('     - Install to one model, symlink to others');
+        print('  4. For selection: creates skill folder structure');
+        print('');
+        print('Symlink Mode:');
+        print('  --symlink --model <src> --symlink <target1> <target2>');
+        print('  Creates links: {target}/skills/{id} -> {src}/skills/{id}');
+        print('');
+        print('Examples:');
+        print('  flutter_shadcn install-skill                    # Interactive: enter skill ID, pick models');
+        print('  flutter_shadcn install-skill --skill my-skill   # Install skill, pick models interactively');
+        print('  flutter_shadcn install-skill --list             # Show installed skills by model');
+        print('  flutter_shadcn install-skill --skill my-skill --model .claude  # Install to specific model');
+        exit(0);
+      }
+
+      // Resolve skills base path (project root for discovering model folders)
+      final skillMgr = SkillManager(
+        projectRoot: targetDir,
+        skillsBasePath: p.join(targetDir, 'skills'),
+        logger: logger,
+      );
+
+      if (skillCommand['list'] == true) {
+        await skillMgr.listSkills();
+      } else if (skillCommand.wasParsed('uninstall')) {
+        final skillId = skillCommand['uninstall'] as String;
+        final model = skillCommand.wasParsed('model')
+            ? skillCommand['model'] as String?
+            : null;
+        if (model == null) {
+          logger.error('--uninstall requires --model');
+          exit(1);
+        }
+        await skillMgr.uninstallSkill(skillId: skillId, model: model);
+      } else if (skillCommand['symlink'] == true) {
+        final skillId = skillCommand.wasParsed('skill')
+            ? skillCommand['skill'] as String
+            : null;
+        final targetModel = skillCommand.wasParsed('model')
+            ? skillCommand['model'] as String
+            : null;
+        if (skillId == null || targetModel == null) {
+          logger.error('--symlink requires both --skill and --model');
+          exit(1);
+        }
+        // Ask for destination models
+        final allModels = skillMgr.discoverModelFolders();
+        final available =
+            allModels.where((m) => m != targetModel).toList();
+        if (available.isEmpty) {
+          logger.error('No other models available to symlink to.');
+          exit(1);
+        }
+        logger.section('🔗 Create symlinks for skill: $skillId');
+        print('\nAvailable target models:');
+        for (var i = 0; i < available.length; i++) {
+          print('  ${i + 1}. ${available[i]}');
+        }
+        print('  ${available.length + 1}. All');
+        stdout.write('\nSelect models (comma-separated) or all: ');
+        final input = stdin.readLineSync()?.trim() ?? '';
+        if (input == '${available.length + 1}' ||
+            input.toLowerCase() == 'all') {
+          for (final model in available) {
+            await skillMgr.symlinkSkill(
+              skillId: skillId,
+              targetModel: targetModel,
+              model: model,
+            );
+          }
+        } else {
+          final indices = input.split(',').map((i) => int.tryParse(i.trim()));
+          for (final idx in indices) {
+            if (idx != null && idx > 0 && idx <= available.length) {
+              await skillMgr.symlinkSkill(
+                skillId: skillId,
+                targetModel: targetModel,
+                model: available[idx - 1],
+              );
+            }
+          }
+        }
+      } else if (skillCommand.wasParsed('skill')) {
+        final skillId = skillCommand['skill'] as String;
+        final model = skillCommand.wasParsed('model')
+            ? skillCommand['model'] as String?
+            : null;
+        if (model != null) {
+          // Direct install to specified model
+          await skillMgr.installSkill(skillId: skillId, model: model);
+        } else {
+          // Interactive mode - show models
+          await skillMgr.installSkillInteractive(skillId: skillId);
+        }
+      } else {
+        // No options - interactive mode
+        stdout.write('Skill id: ');
+        final skillId = stdin.readLineSync()?.trim() ?? '';
+        if (skillId.isEmpty) {
+          logger.error('Skill id cannot be empty.');
+          exit(1);
+        }
+        await skillMgr.installSkillInteractive(skillId: skillId);
+      }
+      break;
   }
 }
 
 void _printUsage() {
   print('Usage: flutter_shadcn <command> [arguments]');
   print('Commands:');
-  print('  init    Initialize shadcn_flutter in the current project');
-  print('  theme   Manage registry theme presets');
-  print('  add     Add a widget');
-  print('  remove  Remove a widget');
-  print('  sync    Sync changes from .shadcn/config.json');
-  print('  assets  Install font/icon assets');
-  print('  platform Configure platform targets');
-  print('  doctor  Diagnose registry resolution');
+  print('  init           Initialize shadcn_flutter in the current project');
+  print('  theme          Manage registry theme presets');
+  print('  add            Add a widget');
+  print('  remove         Remove a widget');
+  print('  sync           Sync changes from .shadcn/config.json');
+  print('  assets         Install font/icon assets');
+  print('  platform       Configure platform targets');
+  print('  list           List available components');
+  print('  search         Search for components');
+  print('  info           Show component details');
+  print('  install-skill  Install AI skills');
+  print('  doctor         Diagnose registry resolution');
   print('');
   print('Global flags:');
   print('  --verbose        Verbose logging');
@@ -985,3 +1211,10 @@ String _stripLibPrefix(String value) {
 
 const String _defaultRemoteRegistryBase =
   'https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib';
+/// Resolves the registry URL from configuration or defaults.
+String _resolveRegistryUrl(ResolvedRoots roots, ShadcnConfig config) {
+  if (config.registryUrl != null && config.registryUrl!.isNotEmpty) {
+    return config.registryUrl!;
+  }
+  return _defaultRemoteRegistryBase;
+}
