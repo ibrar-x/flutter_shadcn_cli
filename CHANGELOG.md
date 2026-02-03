@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.8
+
+- **NEW**: Component discovery system with `list`, `search`, and `info` commands.
+  - Browse components by category with `list`
+  - Search with relevance scoring via `search <query>`
+  - View detailed component info with `info <component-id>`
+- **NEW**: Intelligent index.json caching system (24-hour staleness policy).
+  - Cache location: `~/.flutter_shadcn/cache/{registryId}/index.json`
+  - Use `--refresh` to force cache update from remote
+- **NEW**: Interactive AI skill manager with `install-skill` command.
+  - Auto-discovers AI model folders (`.claude`, `.gpt4`, `.cursor`, `.gemini`, etc.)
+  - Interactive numbered menu for model selection
+  - Multiple installation modes: copy-per-model or install+symlink
+  - List, uninstall, and symlink management for skills
+- **NEW**: Symlink support for sharing skills across models without duplication.
+
 ## 0.1.7
 
 - **BREAKING**: Complete theme preset overhaul with 42 new modern themes.

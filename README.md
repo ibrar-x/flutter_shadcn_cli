@@ -21,6 +21,9 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - Clean output with optional verbose mode.
 - Tracks installed Widgets in a local components.json.
 - Full cleanup on remove --all (components, composites, shared, config, empty folders).
+- **Component discovery**: list, search, and info commands with intelligent caching.
+- **AI skill manager**: Interactive installation with auto-discovery of model folders (.claude, .gpt4, .cursor, etc.).
+- **Symlink support**: Share skills across multiple AI models without duplicating files.
 
 ## Install (pub.dev)
 
@@ -326,6 +329,100 @@ flutter_shadcn doctor
 
 Doctor also reports resolved platform targets (defaults + overrides).
 
+### list
+
+Browse and list all available components from the registry:
+
+```bash
+flutter_shadcn list
+```
+
+Refresh cache from remote:
+
+```bash
+flutter_shadcn list --refresh
+```
+
+### search
+
+Search for components by name, description, tags, or keywords:
+
+```bash
+flutter_shadcn search button
+```
+
+Search results are ranked by relevance:
+
+```bash
+flutter_shadcn search "form input"
+```
+
+Refresh cache:
+
+```bash
+flutter_shadcn search button --refresh
+```
+
+### info
+
+Get detailed information about a specific component:
+
+```bash
+flutter_shadcn info button
+```
+
+Shows:
+- Component description and tags
+- API (constructors, callbacks, properties)
+- Usage examples
+- Dependencies
+- Related components
+
+Refresh cache:
+
+```bash
+flutter_shadcn info button --refresh
+```
+
+### install-skill
+
+Manage AI skills for model-specific installations. Discovers hidden AI model folders (`.claude`, `.gpt4`, `.cursor`, etc.) in your project root.
+
+**Interactive mode** — enter skill ID and choose models:
+
+```bash
+flutter_shadcn install-skill
+```
+
+**Install to specific model:**
+
+```bash
+flutter_shadcn install-skill --skill my-skill --model .claude
+```
+
+**Interactive model selection:**
+
+```bash
+flutter_shadcn install-skill --skill my-skill
+```
+
+**List installed skills by model:**
+
+```bash
+flutter_shadcn install-skill --list
+```
+
+**Uninstall from specific model:**
+
+```bash
+flutter_shadcn install-skill --uninstall my-skill --model .claude
+```
+
+**Installation modes:**
+- Copy skill to each model independently
+- Install to first model + create symlinks to others
+- Selective symlink creation
+
 ## Folder Path Aliases
 
 Set during init, for example:
@@ -398,6 +495,10 @@ If aliases are missing:
 
 ## New Updates
 
+- Component discovery system: `list`, `search`, `info` commands for browsing registry.
+- Intelligent index.json caching with 24-hour staleness policy.
+- Interactive AI skill manager with model folder auto-discovery.
+- Symlink support for sharing skills across multiple AI models.
 - One‑line setup with init --add/--all.
 - Local dev mode saved with --dev.
 - Optional file toggles (README.md, meta.json, preview.dart).
