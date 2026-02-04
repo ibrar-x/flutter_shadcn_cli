@@ -285,11 +285,15 @@ class SkillManager {
       return [];
     }
 
+    // Get the list of known AI model folders
+    final knownModels = _findTemplateModels().toSet();
+
     final models = <String>[];
     for (final entity in rootDir.listSync()) {
       if (entity is Directory) {
         final name = p.basename(entity.path);
-        if (name.startsWith('.') && name.length > 1) {
+        // Only include folders that are in the known AI models list
+        if (knownModels.contains(name)) {
           models.add(name);
         }
       }
