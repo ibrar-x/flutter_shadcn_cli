@@ -2,6 +2,40 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 import 'package:flutter_shadcn_cli/src/logger.dart';
+import 'package:flutter_shadcn_cli/src/skills_loader.dart';
+
+/// AI model folder to display name mapping.
+const Map<String, String> aiModelDisplayNames = {
+  '.claude': 'Claude (Anthropic)',
+  '.cline': 'Cline',
+  '.codebuddy': 'CodeBuddy',
+  '.codex': 'Codex (OpenAI)',
+  '.commandcode': 'CommandCode',
+  '.continue': 'Continue',
+  '.crush': 'Crush',
+  '.cursor': 'Cursor',
+  '.factory': 'Factory',
+  '.gemini': 'Gemini (Google)',
+  '.goose': 'Goose',
+  '.gpt4': 'GPT-4 (OpenAI)',
+  '.junie': 'Junie',
+  '.kilocode': 'KiloCode',
+  '.kiro': 'Kiro',
+  '.kode': 'Kode',
+  '.mcpjam': 'MCPJam',
+  '.mux': 'Mux',
+  '.neovate': 'Neovate',
+  '.opencode': 'OpenCode',
+  '.openhands': 'OpenHands',
+  '.pi': 'Pi',
+  '.pochi': 'Pochi',
+  '.qoder': 'Qoder',
+  '.qwen': 'Qwen',
+  '.roo': 'Roo',
+  '.trae': 'Trae',
+  '.windsurf': 'Windsurf',
+  '.zencoder': 'ZenCoder',
+};
 
 /// Manages AI skill installation and management.
 /// 
@@ -325,6 +359,117 @@ class SkillManager {
     }
   }
 
+  /// Lists available skills from skills.json index.
+  Future<void> listAvailableSkills() async {
+    logger.section('📚 Available Skills');
+    
+    final loader = SkillsLoader(skillsBasePath: skillsBasePath);
+    final index = await loader.load();
+    
+    if (index == null || index.skills.isEmpty) {
+      logger.info('No skills found in registry.');
+      logger.detail('Skills index: skills.json');
+      return;
+    }
+    
+    print('');
+    for (var i = 0; i < index.skills.length; i++) {
+      final skill = index.skills[i];
+      print('  ${i + 1}. ${skill.name} (${skill.id})');
+      print('     ${skill.description}');
+      print('     Version: ${skill.version} | Status: ${skill.status}');
+      if (i < index.skills.length - 1) print('');
+    }
+    print('');
+    logger.info('${index.skills.length} skills available.');
+  }
+  
+  /// Interactive multi-skill installation flow.
+  /// 
+  /// Shows available skills from skills.json and allows user to select
+  /// which skills to install and to which models.
+  Future<void> installSkillsInteractive() async {
+    final loader = SkillsLoader(skillsBasePath: skillsBasePath);
+    final index = await loader.load();
+    
+    if (index == null || index.skills.isEmpty) {
+      logger.error('No skills found in registry.');
+      logger.detail('Create a skills.json file in your skills directory.');
+      return;
+    }
+    
+    // Show available skills
+    logger.section('📚 Available Skills');
+    for (var i = 0; i < index.skills.length; i++) {
+      final skill = index.skills[i];
+      print('  ${i + 1}. ${skill.name} - ${skill.description}');
+    }
+    print('  ${index.skills.length + 1}. All skills');
+    
+    stdout.write('\nSelect skills to install (comma-separated numbers, or ${index.skills.length + 1} for all): ');
+    final input = stdin.readLineSync()?.trim() ?? '';
+    
+    List<SkillEntry> selectedSkills = [];
+    if (input == '${index.skills.length + 1}' || input.toLowerCase() == 'all') {
+      selectedSkills = index.skills;
+    } else {
+      final indices = input.split(',').map((i) => int.tryParse(i.trim()));
+      for (final idx in indices) {
+        if (idx != null && idx > 0 && idx <= index.skills.length) {
+          selectedSkills.add(index.skills[idx - 1]);
+        }
+      }
+    }
+    
+    if (selectedSkills.isEmpty) {
+      logger.error('No skills selected.');
+      return;
+    }
+    
+    // Show AI models
+    final models = discoverModelFolders();
+    if (models.isEmpty) {
+      logger.error('No AI model folders could be discovered or created.');
+      return;
+    }
+    
+    logger.section('🤖 Target AI Models');
+    for (var i = 0; i < models.length; i++) {
+      final displayName = aiModelDisplayNames[models[i]] ?? models[i];
+      print('  ${i + 1}. $displayName');
+    }
+    print('  ${models.length + 1}. All models');
+    
+    stdout.write('\nSelect models (comma-separated numbers, or ${models.length + 1} for all): ');
+    final modelInput = stdin.readLineSync()?.trim() ?? '';
+    
+    List<String> selectedModels = [];
+    if (modelInput == '${models.length + 1}' || modelInput.toLowerCase() == 'all') {
+      selectedModels = models;
+    } else {
+      final indices = modelInput.split(',').map((i) => int.tryParse(i.trim()));
+      for (final idx in indices) {
+        if (idx != null && idx > 0 && idx <= models.length) {
+          selectedModels.add(models[idx - 1]);
+        }
+      }
+    }
+    
+    if (selectedModels.isEmpty) {
+      logger.error('No models selected.');
+      return;
+    }
+    
+    // Install each skill to each model
+    for (final skill in selectedSkills) {
+      for (final model in selectedModels) {
+        await installSkill(skillId: skill.id, model: model);
+      }
+    }
+    
+    logger.success('✓ Installed ${selectedSkills.length} skill(s) to ${selectedModels.length} model(s)');
+  }
+
   /// Interactive installation flow.
   /// 
   /// Shows numbered menu of available AI models and guides user through
@@ -340,7 +485,8 @@ class SkillManager {
     logger.section('🎯 Installing Skill: $skillId');
     logger.detail('Available AI models:');
     for (var i = 0; i < models.length; i++) {
-      print('  ${i + 1}. ${models[i]}');
+      final displayName = aiModelDisplayNames[models[i]] ?? models[i];
+      print('  ${i + 1}. $displayName');
     }
     print('  ${models.length + 1}. All models');
 

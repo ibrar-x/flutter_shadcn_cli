@@ -143,6 +143,8 @@ Future<void> main(List<String> arguments) async {
         ..addOption('skills-url', help: 'Override skills base URL/path')
         ..addFlag('symlink', negatable: false, help: 'Symlink shared skill to model')
         ..addFlag('list', negatable: false, help: 'List installed skills')
+        ..addFlag('available', abbr: 'a', negatable: false, help: 'List available skills from registry')
+        ..addFlag('interactive', abbr: 'i', negatable: false, help: 'Interactive multi-skill installation')
         ..addOption('uninstall', help: 'Uninstall skill')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
@@ -697,6 +699,8 @@ Future<void> main(List<String> arguments) async {
         print('');
         print('Modes:');
         print('  (no args)              Interactive mode: prompts for skill ID and shows model menu');
+        print('  --interactive, -i      Interactive multi-skill installation from skills.json');
+        print('  --available, -a        List all available skills from skills.json registry');
         print('  --list                 List all installed skills grouped by model');
         print('  --skill <id>           Install skill (opens interactive model menu if no --model)');
         print('  --skill <id> --model   Install skill to specific model folder');
@@ -705,18 +709,22 @@ Future<void> main(List<String> arguments) async {
         print('  --uninstall <id>       Remove skill from specific model (requires --model)');
         print('');
         print('Interactive Installation Flow:');
-        print('  1. Discovers all .{model}/ folders (.claude, .gpt4, .cursor, etc.)');
+        print('  1. Discovers all .{model}/ folders (shown with readable names)');
         print('  2. Shows numbered menu: select 1-N models or "all"');
-        print('  3. For "all": choose mode:');
+        print('  3. For multiple selections: choose mode:');
         print('     - Copy skill to each model folder');
         print('     - Install to one model, symlink to others');
-        print('  4. For selection: creates skill folder structure');
+        print('  4. Creates skill folder structure in selected models');
         print('');
-        print('Symlink Mode:');
-        print('  --symlink --model <src> --symlink <target1> <target2>');
-        print('  Creates links: {target}/skills/{id} -> {src}/skills/{id}');
+        print('Multi-Skill Interactive Mode (--interactive):');
+        print('  1. Shows all available skills from skills.json');
+        print('  2. Select which skills to install (comma-separated or "all")');
+        print('  3. Select target AI models (shows readable names like "Cursor", "Claude")');
+        print('  4. Installs selected skills to selected models');
         print('');
         print('Examples:');
+        print('  flutter_shadcn install-skill --interactive     # Multi-skill interactive mode');
+        print('  flutter_shadcn install-skill --available       # List available skills from registry');
         print('  flutter_shadcn install-skill                    # Interactive: enter skill ID, pick models');
         print('  flutter_shadcn install-skill --skill my-skill   # Install skill, pick models interactively');
         print('  flutter_shadcn install-skill --list             # Show installed skills by model');
@@ -740,7 +748,11 @@ Future<void> main(List<String> arguments) async {
         logger: logger,
       );
 
-      if (skillCommand['list'] == true) {
+      if (skillCommand['available'] == true) {
+        await skillMgr.listAvailableSkills();
+      } else if (skillCommand['interactive'] == true) {
+        await skillMgr.installSkillsInteractive();
+      } else if (skillCommand['list'] == true) {
         await skillMgr.listSkills();
       } else if (skillCommand.wasParsed('uninstall')) {
         final skillId = skillCommand['uninstall'] as String;
