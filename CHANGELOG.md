@@ -14,7 +14,38 @@
   - Interactive numbered menu for model selection
   - Multiple installation modes: copy-per-model or install+symlink
   - List, uninstall, and symlink management for skills
+  - Automatically searches for skills in local registry (`shadcn_flutter_kit/flutter_shadcn_kit/skills/`)
+  - **Requires `skill.json` or `skill.yaml` manifest** for installation (throws error if missing)
+  - Parses manifest's `files` key to determine which files to copy
+  - Copies AI-focused documentation: SKILL.md, INSTALLATION.md, references/commands.md, references/examples.md
+  - Management files (skill.json, skill.yaml, schemas.md) remain in registry for CLI use only
+  - Multi-location skill discovery with graceful fallback
 - **NEW**: Symlink support for sharing skills across models without duplication.
+- **NEW**: Dry-run command to preview installs (deps, shared, assets, fonts, platform changes).
+- **NEW**: Doctor validates components.json against components.schema.json and reports cache paths.
+- **NEW**: Local index.json support with remote fallback for list/search/info.
+- **NEW**: Skills URL override (`--skills-url`) with registry URL default.
+- **NEW**: `version` command to show current CLI version and check for updates.
+  - Use `flutter_shadcn version` to display current version
+  - Use `flutter_shadcn version --check` to check for available updates
+- **NEW**: `upgrade` command to upgrade CLI to the latest version.
+  - Automatically fetches and installs the latest version from pub.dev
+  - Use `--force` flag to force upgrade even if already on latest
+- **NEW**: Automatic update checking on every CLI command.
+  - Checks pub.dev once per 24 hours (rate-limited)
+  - Shows subtle notification if newer version available
+  - Cached in `~/.flutter_shadcn/cache/version_check.json`
+  - Opt-out via `.shadcn/config.json`: set `"checkUpdates": false`
+- **NEW**: Comprehensive test coverage for skill manager and version manager.
+  - Skill discovery tests (local kit registry, parent directories, manifest requirement, YAML support)
+  - File copying tests (AI-focused files, manifest exclusion, directory structure)
+  - Skill management tests (install, uninstall, list, symlinks)
+  - Model discovery tests (auto-detection, auto-creation)
+  - Version comparison tests (semver logic, pre-release handling)
+  - Cache management tests (24-hour policy, timestamp handling)
+  - Error handling tests (network failures, malformed responses, missing manifests)
+  - **Total: 38 tests** (13 skill manager + 11 version manager + 14 existing)
+- **FIX**: Graceful error handling for component discovery failures.
 
 ## 0.1.7
 

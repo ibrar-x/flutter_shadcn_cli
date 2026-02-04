@@ -22,8 +22,11 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - Tracks installed Widgets in a local components.json.
 - Full cleanup on remove --all (components, composites, shared, config, empty folders).
 - **Component discovery**: list, search, and info commands with intelligent caching.
+- **Dry-run preview**: See dependencies, assets, and platform changes before install.
 - **AI skill manager**: Interactive installation with auto-discovery of model folders (.claude, .gpt4, .cursor, etc.).
 - **Symlink support**: Share skills across multiple AI models without duplicating files.
+- **Schema validation**: Doctor validates components.json against components.schema.json.
+- **Version management**: Automatic update notifications (once per day) plus manual check and upgrade commands.
 
 ## Install (pub.dev)
 
@@ -229,6 +232,20 @@ flutter_shadcn init --yes \
 flutter_shadcn add button
 ```
 
+### dry-run
+
+Preview everything that will be installed (dependencies, shared, assets, fonts, platform changes):
+
+```bash
+flutter_shadcn dry-run button
+```
+
+Preview all components:
+
+```bash
+flutter_shadcn dry-run --all
+```
+
 ### assets
 
 ```bash
@@ -327,11 +344,14 @@ Use `sync` after editing .shadcn/config.json to move paths and re-apply the them
 flutter_shadcn doctor
 ```
 
-Doctor also reports resolved platform targets (defaults + overrides).
+Doctor also reports resolved platform targets (defaults + overrides), the
+components.json cache location, and schema validation status.
 
 ### list
 
 Browse and list all available components from the registry:
+
+Uses local registry when available; falls back to remote.
 
 ```bash
 flutter_shadcn list
@@ -400,6 +420,12 @@ flutter_shadcn install-skill
 flutter_shadcn install-skill --skill my-skill --model .claude
 ```
 
+**Override skills URL/path:**
+
+```bash
+flutter_shadcn install-skill --skill my-skill --skills-url /path/to/skills
+```
+
 **Interactive model selection:**
 
 ```bash
@@ -422,6 +448,63 @@ flutter_shadcn install-skill --uninstall my-skill --model .claude
 - Copy skill to each model independently
 - Install to first model + create symlinks to others
 - Selective symlink creation
+
+### version
+
+Display the current CLI version or check for updates.
+
+**Show current version:**
+
+```bash
+flutter_shadcn version
+```
+
+**Check for available updates:**
+
+```bash
+flutter_shadcn version --check
+```
+
+### upgrade
+
+Upgrade the CLI to the latest version from pub.dev.
+
+**Upgrade to latest version:**
+
+```bash
+flutter_shadcn upgrade
+```
+
+**Force upgrade (even if already on latest):**
+
+```bash
+flutter_shadcn upgrade --force
+```
+
+The upgrade command will:
+- Check pub.dev for the latest version
+- Download and install the new version
+- Confirm successful upgrade
+- Provide manual upgrade steps if automatic upgrade fails
+
+**Automatic Update Notifications:**
+The CLI automatically checks for updates once per 24 hours on every command execution (except `version` and `upgrade`). If a newer version is available, you'll see:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ A new version of flutter_shadcn_cli is available!      │
+│ Current: 0.1.8 → Latest: 0.1.9                          │
+│ Run: flutter_shadcn upgrade                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Disable automatic checks:**
+Edit `.shadcn/config.json` and set:
+```json
+{
+  "checkUpdates": false
+}
+```
 
 ## Folder Path Aliases
 
@@ -497,8 +580,12 @@ If aliases are missing:
 
 - Component discovery system: `list`, `search`, `info` commands for browsing registry.
 - Intelligent index.json caching with 24-hour staleness policy.
+- Local index.json support with remote fallback.
+- Dry-run preview for dependencies, assets, and platform changes.
 - Interactive AI skill manager with model folder auto-discovery.
 - Symlink support for sharing skills across multiple AI models.
+- Skills URL override with `--skills-url`.
+- Doctor validates components.json schema and reports cache location.
 - One‑line setup with init --add/--all.
 - Local dev mode saved with --dev.
 - Optional file toggles (README.md, meta.json, preview.dart).

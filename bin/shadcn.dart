@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:async';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_shadcn_cli/src/installer.dart';
@@ -8,6 +10,7 @@ import 'package:flutter_shadcn_cli/src/registry.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/discovery_commands.dart';
 import 'package:flutter_shadcn_cli/src/skill_manager.dart';
+import 'package:flutter_shadcn_cli/src/version_manager.dart';
 
 Future<void> main(List<String> arguments) async {
   _ensureExecutablePath();
@@ -61,6 +64,12 @@ Future<void> main(List<String> arguments) async {
     )
     ..addCommand(
       'add',
+      ArgParser()
+        ..addFlag('all', abbr: 'a', negatable: false)
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'dry-run',
       ArgParser()
         ..addFlag('all', abbr: 'a', negatable: false)
         ..addFlag('help', abbr: 'h', negatable: false),
@@ -131,9 +140,22 @@ Future<void> main(List<String> arguments) async {
       ArgParser()
         ..addOption('skill', abbr: 's', help: 'Skill id to install')
         ..addOption('model', abbr: 'm', help: 'Model name (e.g., gpt-4)')
+        ..addOption('skills-url', help: 'Override skills base URL/path')
         ..addFlag('symlink', negatable: false, help: 'Symlink shared skill to model')
         ..addFlag('list', negatable: false, help: 'List installed skills')
         ..addOption('uninstall', help: 'Uninstall skill')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'version',
+      ArgParser()
+        ..addFlag('check', negatable: false, help: 'Check for updates')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'upgrade',
+      ArgParser()
+        ..addFlag('force', abbr: 'f', negatable: false, help: 'Force upgrade even if already latest')
         ..addFlag('help', abbr: 'h', negatable: false),
     );
 
@@ -160,6 +182,16 @@ Future<void> main(List<String> arguments) async {
   final verbose = argResults['verbose'] == true;
   final logger = CliLogger(verbose: verbose);
   var config = await ShadcnConfig.load(targetDir);
+
+  // Auto-check for updates (rate-limited to once per 24 hours)
+  // Skip for version and upgrade commands to avoid recursion
+  final shouldCheckUpdates = config.checkUpdates ?? true;
+  final commandName = argResults.command?.name;
+  if (shouldCheckUpdates && commandName != 'version' && commandName != 'upgrade') {
+    final versionMgr = VersionManager(logger: logger);
+    // Run in background without blocking
+    unawaited(versionMgr.autoCheckForUpdates());
+  }
 
   if (argResults['dev'] == true) {
     final resolvedDevPath = _resolveLocalRoot(
@@ -188,18 +220,31 @@ Future<void> main(List<String> arguments) async {
       print('Diagnostics for registry resolution and environment.');
       return;
     }
-    _runDoctor(roots, argResults, config);
+    await _runDoctor(roots, argResults, config);
     return;
   }
 
-  final needsRegistry = const {'init', 'theme', 'add', 'remove', 'sync', 'assets'};
+  final needsRegistry = const {
+    'init',
+    'theme',
+    'add',
+    'dry-run',
+    'remove',
+    'sync',
+    'assets',
+  };
   Registry? registry;
   if (needsRegistry.contains(argResults.command!.name)) {
     final selection = _resolveRegistrySelection(argResults, roots, config);
+    final schemaPath = _resolveComponentsSchemaPath(roots, selection);
+    final cachePath = _componentsJsonCachePath(selection.registryRoot);
     try {
       registry = await Registry.load(
         registryRoot: selection.registryRoot,
         sourceRoot: selection.sourceRoot,
+        schemaPath: schemaPath,
+        cachePath: cachePath,
+        logger: logger,
       );
     } catch (e) {
       stderr.writeln('Error loading registry: $e');
@@ -409,6 +454,41 @@ Future<void> main(List<String> arguments) async {
         }
       });
       break;
+    case 'dry-run':
+      final dryRunCommand = argResults.command!;
+      final activeInstaller = installer;
+      if (activeInstaller == null) {
+        stderr.writeln('Error: Installer is not available.');
+        exit(1);
+      }
+      if (dryRunCommand['help'] == true) {
+        print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
+        print('       flutter_shadcn dry-run --all');
+        print('');
+        print('Shows what would be installed (dependencies, shared modules, assets, fonts).');
+        print('Options:');
+        print('  --all, -a          Include every available component');
+        print('  --help, -h         Show this message');
+        exit(0);
+      }
+      final rest = dryRunCommand.rest;
+      final dryRunAll = dryRunCommand['all'] == true || rest.contains('all');
+      final componentIds = <String>[];
+      if (dryRunAll) {
+        componentIds.add('icon_fonts');
+        componentIds.add('typography_fonts');
+        componentIds.addAll(activeInstaller.registry.components.map((c) => c.id));
+      } else {
+        if (rest.isEmpty) {
+          print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
+          print('       flutter_shadcn dry-run --all');
+          exit(1);
+        }
+        componentIds.addAll(rest);
+      }
+      final plan = await activeInstaller.buildDryRunPlan(componentIds);
+      activeInstaller.printDryRunPlan(plan);
+      break;
     case 'remove':
       final removeCommand = argResults.command!;
       final activeInstaller = installer;
@@ -548,10 +628,11 @@ Future<void> main(List<String> arguments) async {
         print('  --refresh  Refresh cache from remote');
         exit(0);
       }
-      final registryUrl = _resolveRegistryUrl(roots, config);
+      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final registryUrl = selection.registryRoot.root;
       await handleListCommand(
         registryBaseUrl: registryUrl,
-        registryId: 'default',
+        registryId: _sanitizeCacheKey(registryUrl),
         refresh: listCommand['refresh'] == true,
         logger: logger,
       );
@@ -571,11 +652,12 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn search <query>');
         exit(1);
       }
-      final registryUrl = _resolveRegistryUrl(roots, config);
+      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final registryUrl = selection.registryRoot.root;
       await handleSearchCommand(
         query: searchQuery,
         registryBaseUrl: registryUrl,
-        registryId: 'default',
+        registryId: _sanitizeCacheKey(registryUrl),
         refresh: searchCommand['refresh'] == true,
         logger: logger,
       );
@@ -595,11 +677,12 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn info <component-id>');
         exit(1);
       }
-      final registryUrl = _resolveRegistryUrl(roots, config);
+      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final registryUrl = selection.registryRoot.root;
       await handleInfoCommand(
         componentId: componentId,
         registryBaseUrl: registryUrl,
-        registryId: 'default',
+        registryId: _sanitizeCacheKey(registryUrl),
         refresh: infoCommand['refresh'] == true,
         logger: logger,
       );
@@ -617,6 +700,7 @@ Future<void> main(List<String> arguments) async {
         print('  --list                 List all installed skills grouped by model');
         print('  --skill <id>           Install skill (opens interactive model menu if no --model)');
         print('  --skill <id> --model   Install skill to specific model folder');
+        print('  --skills-url           Override skills base URL/path (defaults to registry URL)');
         print('  --symlink --model      Create symlinks from source model to other models');
         print('  --uninstall <id>       Remove skill from specific model (requires --model)');
         print('');
@@ -641,9 +725,18 @@ Future<void> main(List<String> arguments) async {
       }
 
       // Resolve skills base path (project root for discovering model folders)
+      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final skillsOverride = skillCommand['skills-url'] as String?;
+      final defaultSkillsUrl = skillsOverride?.isNotEmpty == true
+          ? skillsOverride!
+          : (config.registryUrl?.isNotEmpty == true
+              ? config.registryUrl!
+              : selection.sourceRoot.root);
+
       final skillMgr = SkillManager(
         projectRoot: targetDir,
         skillsBasePath: p.join(targetDir, 'skills'),
+        skillsBaseUrl: defaultSkillsUrl,
         logger: logger,
       );
 
@@ -730,6 +823,40 @@ Future<void> main(List<String> arguments) async {
         await skillMgr.installSkillInteractive(skillId: skillId);
       }
       break;
+    case 'version':
+      final versionCommand = argResults.command!;
+      if (versionCommand['help'] == true) {
+        print('Usage: flutter_shadcn version [--check]');
+        print('');
+        print('Shows the current CLI version.');
+        print('');
+        print('Options:');
+        print('  --check  Check for available updates');
+        print('  --help, -h  Show this message');
+        exit(0);
+      }
+      final versionMgr = VersionManager(logger: logger);
+      if (versionCommand['check'] == true) {
+        await versionMgr.checkForUpdates();
+      } else {
+        versionMgr.showVersion();
+      }
+      break;
+    case 'upgrade':
+      final upgradeCommand = argResults.command!;
+      if (upgradeCommand['help'] == true) {
+        print('Usage: flutter_shadcn upgrade [--force]');
+        print('');
+        print('Upgrades flutter_shadcn_cli to the latest version from pub.dev.');
+        print('');
+        print('Options:');
+        print('  --force, -f  Force upgrade even if already on latest version');
+        print('  --help, -h   Show this message');
+        exit(0);
+      }
+      final versionMgr = VersionManager(logger: logger);
+      await versionMgr.upgrade(force: upgradeCommand['force'] == true);
+      break;
   }
 }
 
@@ -739,6 +866,7 @@ void _printUsage() {
   print('  init           Initialize shadcn_flutter in the current project');
   print('  theme          Manage registry theme presets');
   print('  add            Add a widget');
+  print('  dry-run        Preview what would be installed');
   print('  remove         Remove a widget');
   print('  sync           Sync changes from .shadcn/config.json');
   print('  assets         Install font/icon assets');
@@ -747,6 +875,8 @@ void _printUsage() {
   print('  search         Search for components');
   print('  info           Show component details');
   print('  install-skill  Install AI skills');
+  print('  version        Show CLI version');
+  print('  upgrade        Upgrade CLI to latest version');
   print('  doctor         Diagnose registry resolution');
   print('');
   print('Global flags:');
@@ -932,28 +1062,80 @@ String? _findRegistryUpwards(Directory start) {
   return null;
 }
 
-void _runDoctor(ResolvedRoots roots, ArgResults args, ShadcnConfig config) {
+Future<void> _runDoctor(
+  ResolvedRoots roots,
+  ArgResults args,
+  ShadcnConfig config,
+) async {
   final logger = CliLogger(verbose: args['verbose'] == true);
   final selection = _resolveRegistrySelection(args, roots, config);
   final envRoot = Platform.environment['SHADCN_REGISTRY_ROOT'];
   final envUrl = Platform.environment['SHADCN_REGISTRY_URL'];
   final pubCache = Platform.environment['PUB_CACHE'] ??
       p.join(Platform.environment['HOME'] ?? '', '.pub-cache');
+  final schemaPath = _resolveComponentsSchemaPath(roots, selection);
+  final cachePath = _componentsJsonCachePath(selection.registryRoot);
+  final componentsSource = selection.registryRoot.describe('components.json');
+
   logger.header('flutter_shadcn doctor');
-  logger.info('  script: ${Platform.script.toFilePath()}');
-  logger.info('  cwd: ${Directory.current.path}');
-  logger.info('  SHADCN_REGISTRY_ROOT: ${envRoot ?? '(unset)'}');
-  logger.info('  SHADCN_REGISTRY_URL: ${envUrl ?? '(unset)'}');
-  logger.info('  PUB_CACHE: $pubCache');
-  logger.info('  cliRoot: ${roots.cliRoot ?? '(unresolved)'}');
-  logger.info('  localRegistryRoot: ${roots.localRegistryRoot ?? '(unresolved)'}');
-  logger.info('  config.registryMode: ${config.registryMode ?? '(unset)'}');
-  logger.info('  config.registryPath: ${config.registryPath ?? '(unset)'}');
-  logger.info('  config.registryUrl: ${config.registryUrl ?? '(unset)'}');
-  logger.info('  registryMode: ${selection.mode}');
-  logger.info('  registryRoot: ${selection.registryRoot.root}');
+
+  void kv(String label, String value) {
+    const pad = 22;
+    final padded = label.padRight(pad);
+    logger.info('  $padded $value');
+  }
+
+  print('');
+  logger.section('Environment');
+  kv('Script', Platform.script.toFilePath());
+  kv('CWD', Directory.current.path);
+  kv('PUB_CACHE', pubCache);
+
+  print('');
+  logger.section('Registry');
+  kv('Mode', selection.mode);
+  kv('Root', selection.registryRoot.root);
+  kv('components.json', componentsSource);
+  kv('Cache', cachePath ?? '(local registry, no cache)');
+  kv('Schema', schemaPath ?? '(not found)');
+
+  print('');
+  logger.section('Configuration');
+  kv('SHADCN_REGISTRY_ROOT', envRoot ?? '(unset)');
+  kv('SHADCN_REGISTRY_URL', envUrl ?? '(unset)');
+  kv('cliRoot', roots.cliRoot ?? '(unresolved)');
+  kv('localRegistryRoot', roots.localRegistryRoot ?? '(unresolved)');
+  kv('config.registryMode', config.registryMode ?? '(unset)');
+  kv('config.registryPath', config.registryPath ?? '(unset)');
+  kv('config.registryUrl', config.registryUrl ?? '(unset)');
+
+  print('');
+  logger.section('Schema validation');
+  if (schemaPath == null) {
+    logger.warn('  Schema file not found.');
+  } else {
+    try {
+      final content = await selection.registryRoot.readString('components.json');
+      final data = jsonDecode(content);
+      final result = ComponentsSchemaValidator.validate(data, schemaPath);
+      if (result.isValid) {
+        logger.success('  components.json matches the schema.');
+      } else {
+        logger.error('  Schema issues: ${result.errors.length}');
+        for (final error in result.errors.take(12)) {
+          logger.info('  - $error');
+        }
+        if (result.errors.length > 12) {
+          logger.info('  ...and ${result.errors.length - 12} more');
+        }
+      }
+    } catch (e) {
+      logger.error('  Failed to validate schema: $e');
+    }
+  }
 
   final platformTargets = _mergePlatformTargets(config.platformTargets);
+  print('');
   logger.section('Platform targets');
   logger.info('  (set .shadcn/config.json "platformTargets" to override paths)');
   platformTargets.forEach((platform, targets) {
@@ -962,6 +1144,72 @@ void _runDoctor(ResolvedRoots roots, ArgResults args, ShadcnConfig config) {
       logger.info('    ${entry.key}: ${entry.value}');
     }
   });
+}
+
+String? _componentsJsonCachePath(RegistryLocation registryRoot) {
+  if (!registryRoot.isRemote) {
+    return null;
+  }
+  final home = Platform.environment['HOME'] ?? '';
+  if (home.isEmpty) {
+    return null;
+  }
+  final cacheRoot = p.join(home, '.flutter_shadcn', 'cache', 'registry');
+  final safeKey = _sanitizeCacheKey(registryRoot.root);
+  return p.join(cacheRoot, safeKey, 'components.json');
+}
+
+String _sanitizeCacheKey(String value) {
+  final safe = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  if (safe.length > 80) {
+    return safe.substring(0, 80);
+  }
+  return safe;
+}
+
+String? _resolveComponentsSchemaPath(
+  ResolvedRoots roots,
+  RegistrySelection selection,
+) {
+  final candidates = <String?>[
+    p.join(
+      Directory.current.path,
+      'shadcn_flutter_kit',
+      'flutter_shadcn_kit',
+      'lib',
+      'registry',
+      'components.schema.json',
+    ),
+    p.join(
+      Directory.current.path,
+      'flutter_shadcn_kit',
+      'lib',
+      'registry',
+      'components.schema.json',
+    ),
+    roots.localRegistryRoot == null
+        ? null
+        : p.join(roots.localRegistryRoot!, 'components.schema.json'),
+    '/Users/ibrar/Desktop/infinora.noworkspace/shadcn_copy_paste/shadcn_flutter_kit/flutter_shadcn_kit/lib/registry/components.schema.json',
+  ];
+
+  for (final candidate in candidates) {
+    if (candidate == null) {
+      continue;
+    }
+    if (File(candidate).existsSync()) {
+      return candidate;
+    }
+  }
+
+  if (!selection.registryRoot.isRemote) {
+    final localPath = p.join(selection.registryRoot.root, 'components.schema.json');
+    if (File(localPath).existsSync()) {
+      return localPath;
+    }
+  }
+
+  return null;
 }
 
 Map<String, Map<String, String>> _mergePlatformTargets(
@@ -1211,10 +1459,3 @@ String _stripLibPrefix(String value) {
 
 const String _defaultRemoteRegistryBase =
   'https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib';
-/// Resolves the registry URL from configuration or defaults.
-String _resolveRegistryUrl(ResolvedRoots roots, ShadcnConfig config) {
-  if (config.registryUrl != null && config.registryUrl!.isNotEmpty) {
-    return config.registryUrl!;
-  }
-  return _defaultRemoteRegistryBase;
-}

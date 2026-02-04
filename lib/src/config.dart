@@ -14,6 +14,7 @@ class ShadcnConfig {
   final bool? includeReadme;
   final bool? includeMeta;
   final bool? includePreview;
+  final bool? checkUpdates;
   final Map<String, String>? pathAliases;
   final Map<String, Map<String, String>>? platformTargets;
 
@@ -28,6 +29,7 @@ class ShadcnConfig {
     this.includeReadme,
     this.includeMeta,
     this.includePreview,
+    this.checkUpdates = true,
     this.pathAliases,
     this.platformTargets,
   });
@@ -42,6 +44,7 @@ class ShadcnConfig {
       installPath: json['installPath'] as String?,
       sharedPath: json['sharedPath'] as String?,
       includeReadme: json['includeReadme'] as bool?,
+      checkUpdates: json['checkUpdates'] as bool? ?? true,
       includeMeta: json['includeMeta'] as bool?,
       includePreview: json['includePreview'] as bool?,
       pathAliases: (json['pathAliases'] as Map?)?.map(
@@ -70,6 +73,7 @@ class ShadcnConfig {
       'sharedPath': sharedPath,
       'includeReadme': includeReadme,
       'includeMeta': includeMeta,
+      'checkUpdates': checkUpdates,
       'includePreview': includePreview,
       'pathAliases': pathAliases,
       'platformTargets': platformTargets,
@@ -113,6 +117,7 @@ class ShadcnConfig {
     bool? includeReadme,
     bool? includeMeta,
     bool? includePreview,
+    bool? checkUpdates,
     Map<String, String>? pathAliases,
     Map<String, Map<String, String>>? platformTargets,
   }) {
@@ -127,6 +132,7 @@ class ShadcnConfig {
       includeReadme: includeReadme ?? this.includeReadme,
       includeMeta: includeMeta ?? this.includeMeta,
       includePreview: includePreview ?? this.includePreview,
+      checkUpdates: checkUpdates ?? this.checkUpdates,
       pathAliases: pathAliases ?? this.pathAliases,
       platformTargets: platformTargets ?? this.platformTargets,
     );

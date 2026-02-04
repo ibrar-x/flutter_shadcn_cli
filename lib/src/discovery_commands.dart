@@ -51,7 +51,8 @@ Future<void> handleListCommand({
     logger.info('${components.length} components total.');
   } catch (e) {
     logger.error('Failed to load components: $e');
-    rethrow;
+    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    return;
   }
 }
 
@@ -109,7 +110,8 @@ Future<void> handleSearchCommand({
     logger.info('Found ${components.length} matching components.');
   } catch (e) {
     logger.error('Failed to search components: $e');
-    rethrow;
+    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    return;
   }
 }
 
@@ -194,8 +196,16 @@ Future<void> handleInfoCommand({
 
     if (comp.examples.isNotEmpty) {
       print('  Examples:');
-      for (final key in comp.examples.keys) {
-        print('    • $key');
+      for (final entry in comp.examples.entries) {
+        final label = entry.key;
+        final value = entry.value;
+        print('    • $label');
+        if (value is String && value.trim().isNotEmpty) {
+          final lines = value.trimRight().split('\n');
+          for (final line in lines) {
+            print('      $line');
+          }
+        }
       }
       print('');
     }
@@ -225,6 +235,7 @@ Future<void> handleInfoCommand({
     }
   } catch (e) {
     logger.error('Failed to load component info: $e');
-    rethrow;
+    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    return;
   }
 }

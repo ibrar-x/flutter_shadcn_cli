@@ -1,15 +1,31 @@
+// Generated theme preset data used by the CLI.
+//
+// This file provides lightweight color and token maps so the CLI can apply
+// presets without depending on Flutter runtime libraries.
 // GENERATED CODE - DO NOT MODIFY BY HAND.
 // Derived from Theme Presets.ts for CLI use.
 
 /// Theme preset data containing color + design tokens for light/dark.
 class RegistryThemePresetData {
+  /// Unique preset id (e.g. `modern-minimal`).
   final String id;
+
+  /// Human-readable preset name.
   final String name;
+
+  /// Light mode color tokens keyed by token name.
   final Map<String, String> light;
+
+  /// Dark mode color tokens keyed by token name.
   final Map<String, String> dark;
+
+  /// Light mode design tokens (spacing, radius, fonts, etc.).
   final Map<String, String> lightTokens;
+
+  /// Dark mode design tokens (spacing, radius, fonts, etc.).
   final Map<String, String> darkTokens;
 
+  /// Creates a theme preset data container for CLI usage.
   const RegistryThemePresetData({
     required this.id,
     required this.name,
@@ -20,6 +36,7 @@ class RegistryThemePresetData {
   });
 }
 
+/// All bundled theme presets for the registry.
 const List<RegistryThemePresetData> registryThemePresetsData = [
   RegistryThemePresetData(
     id: 'amber-minimal',

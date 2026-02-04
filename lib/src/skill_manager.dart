@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:path/path.dart' as p;
 import 'package:flutter_shadcn_cli/src/logger.dart';
 
@@ -13,17 +14,17 @@ import 'package:flutter_shadcn_cli/src/logger.dart';
 class SkillManager {
   final String projectRoot;
   final String skillsBasePath;
+  final String skillsBaseUrl;
   final CliLogger logger;
 
   SkillManager({
     required this.projectRoot,
     required this.skillsBasePath,
+    String? skillsBaseUrl,
     required this.logger,
-  });
-
-  /// GitHub base URL for skills repository.
-  static const _skillsRepoUrl =
-      'https://github.com/ibrar-x/shadcn_flutter_kit/tree/main/flutter_shadcn_kit/skill';
+  }) : skillsBaseUrl = skillsBaseUrl?.isNotEmpty == true
+            ? skillsBaseUrl!
+            : 'https://github.com/ibrar-x/shadcn_flutter_kit/tree/main/flutter_shadcn_kit/skill';
 
   /// Installs a skill from GitHub.
   /// 
@@ -55,7 +56,7 @@ class SkillManager {
       }
 
       // Download skill files
-      logger.detail('Downloading skill from $_skillsRepoUrl/$skillId');
+      logger.detail('Downloading skill from $skillsBaseUrl/$skillId');
       await _downloadSkillFiles(skillId, installPath);
 
       if (model != null) {
@@ -126,40 +127,34 @@ class SkillManager {
   Future<void> listSkills() async {
     logger.section('📚 Installed Skills');
 
-    final baseDir = Directory(skillsBasePath);
-    if (!baseDir.existsSync()) {
-      logger.info('No skills installed yet.');
-      return;
-    }
-
-    // List shared skills
     final shared = <String>[];
     final models = <String, List<String>>{};
 
-    for (final entity in baseDir.listSync()) {
-      if (entity is Directory) {
-        final name = p.basename(entity.path);
-
-        if (name == 'models') {
-          // List model-specific skills
-          for (final modelDir in entity.listSync()) {
-            if (modelDir is Directory) {
-              final modelName = p.basename(modelDir.path);
-              final skillIds = <String>[];
-              for (final skillEntity in modelDir.listSync()) {
-                if (skillEntity is Directory || skillEntity is Link) {
-                  skillIds.add(p.basename(skillEntity.path));
-                }
-              }
-              if (skillIds.isNotEmpty) {
-                models[modelName] = skillIds;
-              }
-            }
-          }
-        } else {
-          // Shared skill
-          shared.add(name);
+    final sharedDir = Directory(skillsBasePath);
+    if (sharedDir.existsSync()) {
+      for (final entity in sharedDir.listSync()) {
+        if (entity is Directory) {
+          shared.add(p.basename(entity.path));
         }
+      }
+    }
+
+    final modelFolders = discoverModelFolders();
+    for (final model in modelFolders) {
+      final modelSkillsDir = Directory(p.join(projectRoot, model, 'skills'));
+      if (!modelSkillsDir.existsSync()) {
+        continue;
+      }
+
+      final skillIds = <String>[];
+      for (final skillEntity in modelSkillsDir.listSync()) {
+        if (skillEntity is Directory || skillEntity is Link) {
+          skillIds.add(p.basename(skillEntity.path));
+        }
+      }
+
+      if (skillIds.isNotEmpty) {
+        models[model] = skillIds;
       }
     }
 
@@ -232,22 +227,101 @@ class SkillManager {
         return [];
       }
 
-      final entities = projectDir.listSync();
-      final models = <String>[];
+      final existing = _listHiddenDirs(projectRoot);
+      final template = _findTemplateModels();
+      final merged = <String>{...existing, ...template}.toList()..sort();
 
-      for (final entity in entities) {
-        if (entity is Directory) {
-          final name = p.basename(entity.path);
-          if (name.startsWith('.') && name.length > 1) {
-            models.add(name);
-          }
+      if (merged.isEmpty) {
+        return [];
+      }
+
+      for (final model in merged) {
+        final modelDir = Directory(p.join(projectRoot, model));
+        if (!modelDir.existsSync()) {
+          modelDir.createSync(recursive: true);
         }
       }
 
-      return models..sort();
+      return merged;
     } catch (e) {
       logger.error('Error discovering model folders: $e');
       return [];
+    }
+  }
+
+  List<String> _listHiddenDirs(String rootPath) {
+    final rootDir = Directory(rootPath);
+    if (!rootDir.existsSync()) {
+      return [];
+    }
+
+    final models = <String>[];
+    for (final entity in rootDir.listSync()) {
+      if (entity is Directory) {
+        final name = p.basename(entity.path);
+        if (name.startsWith('.') && name.length > 1) {
+          models.add(name);
+        }
+      }
+    }
+
+    return models..sort();
+  }
+
+  List<String> _findTemplateModels() {
+    final templateRoot = _findRemotionVideosRoot();
+    if (templateRoot != null) {
+      final models = _listHiddenDirs(templateRoot);
+      if (models.isNotEmpty) {
+        return models;
+      }
+    }
+
+    return const [
+      '.claude',
+      '.cline',
+      '.codebuddy',
+      '.codex',
+      '.commandcode',
+      '.continue',
+      '.crush',
+      '.cursor',
+      '.factory',
+      '.gemini',
+      '.goose',
+      '.junie',
+      '.kilocode',
+      '.kiro',
+      '.kode',
+      '.mcpjam',
+      '.mux',
+      '.neovate',
+      '.opencode',
+      '.openhands',
+      '.pi',
+      '.pochi',
+      '.qoder',
+      '.qwen',
+      '.roo',
+      '.trae',
+      '.windsurf',
+      '.zencoder',
+    ];
+  }
+
+  String? _findRemotionVideosRoot() {
+    var current = Directory(projectRoot);
+    while (true) {
+      final candidate = Directory(p.join(current.path, 'remotion-videos'));
+      if (candidate.existsSync()) {
+        return candidate.path;
+      }
+
+      final parent = current.parent;
+      if (parent.path == current.path) {
+        return null;
+      }
+      current = parent;
     }
   }
 
@@ -259,9 +333,7 @@ class SkillManager {
     final models = discoverModelFolders();
     
     if (models.isEmpty) {
-      logger.error(
-        'No AI model folders found. Create folders like .claude, .gpt4, .cursor in project root.',
-      );
+      logger.error('No AI model folders could be discovered or created.');
       return;
     }
 
@@ -324,13 +396,169 @@ class SkillManager {
     }
   }
 
-  /// Downloads skill files from GitHub.
+  /// Downloads or copies skill files from source.
   /// 
-  /// This is a placeholder - in production, you'd use GitHub API or
-  /// clone the repository.
+  /// First tries local registry, then falls back to GitHub/remote.
   Future<void> _downloadSkillFiles(String skillId, String targetPath) async {
-    // TODO: Implement actual file download from GitHub
-    // For now, create a placeholder manifest
+    // Try local registry first
+    final localSkillPath = await _findLocalSkillPath(skillId);
+    
+    if (localSkillPath != null) {
+      logger.detail('Copying skill from local registry: $localSkillPath');
+      await _copyLocalSkillFiles(localSkillPath, targetPath);
+      return;
+    }
+
+    // Fallback: Try to download from GitHub (placeholder for now)
+    logger.detail('Local skill not found. Creating placeholder...');
+    await _createPlaceholderManifest(skillId, targetPath);
+  }
+
+  /// Finds local skill path by checking common locations.
+  Future<String?> _findLocalSkillPath(String skillId) async {
+    // Check 1: shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}
+    var current = Directory(projectRoot);
+    while (true) {
+      final candidate = Directory(
+        p.join(current.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'skills', skillId),
+      );
+      if (await candidate.exists()) {
+        return candidate.path;
+      }
+
+      // Check 2: Look for skills/ in parent directories
+      final skillsCandidate = Directory(p.join(current.path, 'skills', skillId));
+      if (await skillsCandidate.exists()) {
+        return skillsCandidate.path;
+      }
+
+      final parent = current.parent;
+      if (parent.path == current.path) {
+        break;
+      }
+      current = parent;
+    }
+
+    // Check 3: Direct path in project root
+    final rootSkill = Directory(p.join(projectRoot, 'skills', skillId));
+    if (await rootSkill.exists()) {
+      return rootSkill.path;
+    }
+
+    return null;
+  }
+
+  /// Copies skill files from local registry to target path.
+  /// 
+  /// Requires either skill.json or skill.yaml manifest in the source path.
+  /// The manifest's 'files' key determines which files to copy.
+  Future<void> _copyLocalSkillFiles(String sourcePath, String targetPath) async {
+    final sourceDir = Directory(sourcePath);
+    final files = <File>[];
+    
+    // Check for skill.json first, then skill.yaml
+    File? manifestFile;
+    final skillJsonFile = File(p.join(sourcePath, 'skill.json'));
+    final skillYamlFile = File(p.join(sourcePath, 'skill.yaml'));
+    
+    if (await skillJsonFile.exists()) {
+      manifestFile = skillJsonFile;
+    } else if (await skillYamlFile.exists()) {
+      manifestFile = skillYamlFile;
+    }
+    
+    if (manifestFile == null) {
+      logger.error('No skill.json or skill.yaml found in $sourcePath');
+      throw Exception('Skill manifest (skill.json or skill.yaml) is required');
+    }
+    
+    // Read manifest to know which files to copy
+    try {
+      final content = await manifestFile.readAsString();
+      Map<String, dynamic>? json;
+      
+      // Parse based on file extension
+      if (p.extension(manifestFile.path) == '.json') {
+        json = jsonDecode(content) as Map<String, dynamic>;
+      } else {
+        // For YAML support, we'd use yaml package here
+        // For now, log and fall back to markdown files
+        logger.detail('YAML manifest found but YAML parsing not yet implemented');
+      }
+      
+      if (json != null) {
+        final filesConfig = json['files'] as Map<String, dynamic>?;
+        
+        if (filesConfig != null) {
+          // Add main file
+          if (filesConfig['main'] != null) {
+            files.add(File(p.join(sourcePath, filesConfig['main'] as String)));
+          }
+          
+          // Add installation file
+          if (filesConfig['installation'] != null) {
+            files.add(File(p.join(sourcePath, filesConfig['installation'] as String)));
+          }
+          
+          // Add readme if exists
+          if (filesConfig['readme'] != null) {
+            final readmeFile = File(p.join(sourcePath, filesConfig['readme'] as String));
+            if (await readmeFile.exists()) {
+              files.add(readmeFile);
+            }
+          }
+          
+          // Add reference files (excluding schemas - that's for CLI management)
+          if (filesConfig['references'] is Map) {
+            final references = filesConfig['references'] as Map<String, dynamic>;
+            for (final entry in references.entries) {
+              if (entry.key != 'schemas' && entry.value is String) {
+                files.add(File(p.join(sourcePath, entry.value as String)));
+              }
+            }
+          }
+        }
+        
+        // NOTE: skill.json and skill.yaml are CLI management files
+        // They are NOT copied to model folders - only used by CLI to determine what to copy
+        logger.detail('Using manifest: ${p.basename(manifestFile.path)}');
+      } else {
+        logger.detail('No files configuration found in manifest');
+      }
+    } catch (e) {
+      logger.error('Error parsing manifest: $e');
+      throw Exception('Failed to read skill manifest: $e');
+    }
+    
+    // Validate that we have files to copy
+    if (files.isEmpty) {
+      logger.error('No files configured in manifest to copy');
+      throw Exception('Manifest must specify files to copy in the "files" key');
+    }
+    
+    // Copy each file maintaining directory structure
+    for (final file in files) {
+      if (!await file.exists()) {
+        logger.detail('Skipping missing file: ${file.path}');
+        continue;
+      }
+      
+      final relativePath = p.relative(file.path, from: sourcePath);
+      final destFile = File(p.join(targetPath, relativePath));
+      
+      // Create parent directories
+      await destFile.parent.create(recursive: true);
+      
+      // Copy file
+      await file.copy(destFile.path);
+      logger.detail('✓ Copied: $relativePath');
+    }
+    
+    logger.success('✓ Copied ${files.length} skill files');
+  }
+
+  /// Creates a placeholder manifest when skill source is not found.
+  Future<void> _createPlaceholderManifest(String skillId, String targetPath) async {
     final manifestFile = File(p.join(targetPath, 'manifest.json'));
     await manifestFile.writeAsString('''{
   "skill": {
@@ -341,10 +569,11 @@ class SkillManager {
     "models": ["gpt-4", "claude-3"],
     "createdAt": "${DateTime.now().toIso8601String()}"
   },
-  "files": []
+  "files": [],
+  "note": "This is a placeholder. Skill files were not found in local registry."
 }
 ''');
 
-    logger.detail('Placeholder skill manifest created at: ${manifestFile.path}');
+    logger.detail('Placeholder manifest created at: ${manifestFile.path}');
   }
 }

@@ -40,7 +40,18 @@ class IndexLoader {
     }
 
     // Download from remote
-    return await _downloadAndCache();
+    try {
+      return await _downloadAndCache();
+    } catch (e) {
+      if (cacheFile.existsSync()) {
+        try {
+          return await _parseCache(cacheFile);
+        } catch (_) {
+          // ignore cache fallback
+        }
+      }
+      rethrow;
+    }
   }
 
   /// Gets or creates the cache file path.
@@ -72,16 +83,28 @@ class IndexLoader {
 
   /// Downloads index.json from remote registry and caches it.
   Future<Map<String, dynamic>> _downloadAndCache() async {
-    final url = _resolveIndexUrl();
-    final response = await http.get(Uri.parse(url));
+    final localPath = _resolveLocalIndexPath();
+    Map<String, dynamic> data;
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        'Failed to fetch index.json from $url (${response.statusCode})',
-      );
+    if (localPath != null) {
+      final file = File(localPath);
+      if (!file.existsSync()) {
+        throw Exception('Index file not found: $localPath');
+      }
+      final content = await file.readAsString();
+      data = jsonDecode(content) as Map<String, dynamic>;
+    } else {
+      final url = _resolveIndexUrl();
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          'Failed to fetch index.json from $url (${response.statusCode})',
+        );
+      }
+
+      data = jsonDecode(response.body) as Map<String, dynamic>;
     }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
 
     // Cache the downloaded file
     final cacheFile = _getCacheFile();
@@ -95,10 +118,44 @@ class IndexLoader {
 
   /// Resolves the full URL to the remote index.json.
   String _resolveIndexUrl() {
-    final base = registryBaseUrl.endsWith('/') 
-        ? registryBaseUrl 
+    final base = registryBaseUrl.endsWith('/')
+        ? registryBaseUrl
         : '$registryBaseUrl/';
-    return '${base}dist/index.json';
+    return '${base}index.json';
+  }
+
+  String? _resolveLocalIndexPath() {
+    final base = registryBaseUrl;
+    final uri = Uri.tryParse(base);
+    String? basePath;
+
+    if (uri != null && uri.hasScheme && uri.scheme != 'file') {
+      return null;
+    }
+
+    if (uri != null && uri.scheme == 'file') {
+      basePath = uri.toFilePath();
+    } else {
+      basePath = base;
+    }
+
+    if (basePath.isEmpty) {
+      return null;
+    }
+
+    final normalized = p.normalize(basePath);
+    final candidates = <String>[
+      p.join(normalized, 'index.json'),
+      p.join(normalized, 'registry', 'index.json'),
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+
+    return null;
   }
 
   /// Returns the user's home directory.
