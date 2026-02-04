@@ -453,7 +453,6 @@ class SkillManager {
   /// Requires either skill.json or skill.yaml manifest in the source path.
   /// The manifest's 'files' key determines which files to copy.
   Future<void> _copyLocalSkillFiles(String sourcePath, String targetPath) async {
-    final sourceDir = Directory(sourcePath);
     final files = <File>[];
     
     // Check for skill.json first, then skill.yaml

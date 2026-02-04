@@ -136,8 +136,7 @@ void main() {
         
         File(p.join(skillDir.path, 'README.md')).writeAsStringSync('# No Manifest Skill');
 
-        final modelDir = Directory(p.join(projectRoot.path, '.claude'))
-          ..createSync();
+        Directory(p.join(projectRoot.path, '.claude')).createSync();
 
         // Should throw because no manifest exists
         expect(
@@ -164,8 +163,7 @@ files:
         
         File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# YAML Skill');
 
-        final modelDir = Directory(p.join(projectRoot.path, '.claude'))
-          ..createSync();
+        Directory(p.join(projectRoot.path, '.claude')).createSync();
 
         // YAML parsing not yet implemented, should throw error about no files to copy
         // Once YAML parsing is added, update this test to verify proper file copying
