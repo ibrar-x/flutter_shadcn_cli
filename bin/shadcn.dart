@@ -698,35 +698,29 @@ Future<void> main(List<String> arguments) async {
         print('Discovers hidden AI model folders (.claude, .gpt4, .cursor, etc.) in project root.');
         print('');
         print('Modes:');
-        print('  (no args)              Interactive mode: prompts for skill ID and shows model menu');
-        print('  --interactive, -i      Interactive multi-skill installation from skills.json');
+        print('  (no args)              Multi-skill interactive mode (default)');
         print('  --available, -a        List all available skills from skills.json registry');
         print('  --list                 List all installed skills grouped by model');
-        print('  --skill <id>           Install skill (opens interactive model menu if no --model)');
+        print('  --skill <id>           Install single skill (opens interactive model menu if no --model)');
         print('  --skill <id> --model   Install skill to specific model folder');
         print('  --skills-url           Override skills base URL/path (defaults to registry URL)');
         print('  --symlink --model      Create symlinks from source model to other models');
         print('  --uninstall <id>       Remove skill from specific model (requires --model)');
         print('');
-        print('Interactive Installation Flow:');
-        print('  1. Discovers all .{model}/ folders (shown with readable names)');
-        print('  2. Shows numbered menu: select 1-N models or "all"');
-        print('  3. For multiple selections: choose mode:');
-        print('     - Copy skill to each model folder');
-        print('     - Install to one model, symlink to others');
-        print('  4. Creates skill folder structure in selected models');
-        print('');
-        print('Multi-Skill Interactive Mode (--interactive):');
+        print('Default Interactive Installation Flow:');
         print('  1. Shows all available skills from skills.json');
         print('  2. Select which skills to install (comma-separated or "all")');
-        print('  3. Select target AI models (shows readable names like "Cursor", "Claude")');
-        print('  4. Installs selected skills to selected models');
+        print('  3. Discovers all .{model}/ folders (shown with readable names)');
+        print('  4. Select target models (numbered menu or "all")');
+        print('  5. Choose mode for multiple selections:');
+        print('     - Copy skill to each model folder');
+        print('     - Install to one model, symlink to others');
+        print('  6. Creates skill folder structure in selected models');
         print('');
         print('Examples:');
-        print('  flutter_shadcn install-skill --interactive     # Multi-skill interactive mode');
-        print('  flutter_shadcn install-skill --available       # List available skills from registry');
-        print('  flutter_shadcn install-skill                    # Interactive: enter skill ID, pick models');
-        print('  flutter_shadcn install-skill --skill my-skill   # Install skill, pick models interactively');
+        print('  flutter_shadcn install-skill                    # Default: multi-skill interactive');
+        print('  flutter_shadcn install-skill --available        # List available skills from registry');
+        print('  flutter_shadcn install-skill --skill my-skill   # Install single skill, pick models');
         print('  flutter_shadcn install-skill --list             # Show installed skills by model');
         print('  flutter_shadcn install-skill --skill my-skill --model .claude  # Install to specific model');
         exit(0);
@@ -750,8 +744,6 @@ Future<void> main(List<String> arguments) async {
 
       if (skillCommand['available'] == true) {
         await skillMgr.listAvailableSkills();
-      } else if (skillCommand['interactive'] == true) {
-        await skillMgr.installSkillsInteractive();
       } else if (skillCommand['list'] == true) {
         await skillMgr.listSkills();
       } else if (skillCommand.wasParsed('uninstall')) {
@@ -825,14 +817,8 @@ Future<void> main(List<String> arguments) async {
           await skillMgr.installSkillInteractive(skillId: skillId);
         }
       } else {
-        // No options - interactive mode
-        stdout.write('Skill id: ');
-        final skillId = stdin.readLineSync()?.trim() ?? '';
-        if (skillId.isEmpty) {
-          logger.error('Skill id cannot be empty.');
-          exit(1);
-        }
-        await skillMgr.installSkillInteractive(skillId: skillId);
+        // Default: multi-skill interactive mode (no flags needed)
+        await skillMgr.installSkillsInteractive();
       }
       break;
     case 'version':
