@@ -2,12 +2,17 @@
 
 ## 0.1.8
 
+### 🎯 Component Discovery
 - **NEW**: Component discovery system with `list`, `search`, and `info` commands.
   - Browse components by category with `list`
   - Search with relevance scoring via `search <query>`
   - View detailed component info with `info <component-id>`
-  - Intelligent index.json caching (24-hour staleness policy) at `~/.flutter_shadcn/cache/{registryId}/index.json`
-  - Local index.json support with remote fallback and `--refresh` flag to force updates
+- **NEW**: Intelligent index.json caching (24-hour staleness policy).
+  - Cache location: `~/.flutter_shadcn/cache/{registryId}/index.json`
+  - Local index.json support with remote fallback
+  - Use `--refresh` flag to force cache update from remote
+
+### 🤖 AI Skills Management
 - **NEW**: Interactive AI skill manager with `install-skill` command.
   - **Default multi-skill interactive mode** - just run `flutter_shadcn install-skill` (no flags needed)
   - Auto-discovers AI model folders (`.claude`, `.gpt4`, `.cursor`, `.gemini`, etc.)
@@ -15,7 +20,7 @@
   - **Only creates selected model folders**, not all template folders
   - Multiple installation modes: copy-per-model or install+symlink for sharing across models
   - List, uninstall, and symlink management commands
-  - **skills.json discovery index** for browsing available skills (like index.json for components)
+- **NEW**: skills.json discovery index for browsing available skills (like index.json for components).
   - `--available` / `-a` flag to list all available skills from registry
   - `--skill <id>` flag for installing single skills with interactive model selection
   - `--skill <id> --model <name>` for direct installation to specific model
@@ -24,8 +29,12 @@
   - **Requires `skill.json` or `skill.yaml` manifest** for installation (throws error if missing)
   - Copies AI-focused documentation: SKILL.md, INSTALLATION.md, references/{commands,examples}.md
   - Management files (skill.json, skill.yaml, schemas.md) remain in registry for CLI use only
+
+### 🔧 Project Management Commands
 - **NEW**: Dry-run command to preview component installs (deps, shared, assets, fonts, platform changes).
 - **NEW**: Doctor validates components.json against components.schema.json and reports cache paths.
+
+### 📦 Version Management
 - **NEW**: `version` command to show current CLI version and check for updates.
   - Use `flutter_shadcn version` to display current version
   - Use `flutter_shadcn version --check` to check for available updates
@@ -37,6 +46,8 @@
   - Shows subtle notification if newer version available
   - Cached in `~/.flutter_shadcn/cache/version_check.json`
   - Opt-out via `.shadcn/config.json`: set `"checkUpdates": false`
+
+### 🧪 Testing & Quality
 - **NEW**: Comprehensive test coverage for skill manager and version manager.
   - Skill discovery tests (local kit registry, parent directories, manifest requirement, YAML support)
   - File copying tests (AI-focused files, manifest exclusion, directory structure)
@@ -46,6 +57,8 @@
   - Cache management tests (24-hour policy, timestamp handling)
   - Error handling tests (network failures, malformed responses, missing manifests)
   - **Total: 38 tests** (13 skill manager + 11 version manager + 14 existing)
+
+### 🐛 Bug Fixes
 - **FIX**: Graceful error handling for component discovery failures.
 
 ## 0.1.7
