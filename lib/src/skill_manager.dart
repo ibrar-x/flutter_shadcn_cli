@@ -279,38 +279,8 @@ class SkillManager {
     }
   }
 
-  List<String> _listHiddenDirs(String rootPath) {
-    final rootDir = Directory(rootPath);
-    if (!rootDir.existsSync()) {
-      return [];
-    }
-
-    // Get the list of known AI model folders
-    final knownModels = _findTemplateModels().toSet();
-
-    final models = <String>[];
-    for (final entity in rootDir.listSync()) {
-      if (entity is Directory) {
-        final name = p.basename(entity.path);
-        // Only include folders that are in the known AI models list
-        if (knownModels.contains(name)) {
-          models.add(name);
-        }
-      }
-    }
-
-    return models..sort();
-  }
-
-  List<String> _findTemplateModels() {
-    final templateRoot = _findRemotionVideosRoot();
-    if (templateRoot != null) {
-      final models = _listHiddenDirs(templateRoot);
-      if (models.isNotEmpty) {
-        return models;
-      }
-    }
-
+  /// Returns the hardcoded list of known AI model folders.
+  List<String> _getKnownAIModels() {
     return const [
       '.claude',
       '.cline',
@@ -341,6 +311,42 @@ class SkillManager {
       '.windsurf',
       '.zencoder',
     ];
+  }
+
+  List<String> _listHiddenDirs(String rootPath) {
+    final rootDir = Directory(rootPath);
+    if (!rootDir.existsSync()) {
+      return [];
+    }
+
+    // Get the list of known AI model folders (from constants, not recursively)
+    final knownModels = _getKnownAIModels().toSet();
+
+    final models = <String>[];
+    for (final entity in rootDir.listSync()) {
+      if (entity is Directory) {
+        final name = p.basename(entity.path);
+        // Only include folders that are in the known AI models list
+        if (knownModels.contains(name)) {
+          models.add(name);
+        }
+      }
+    }
+
+    return models..sort();
+  }
+
+  List<String> _findTemplateModels() {
+    final templateRoot = _findRemotionVideosRoot();
+    if (templateRoot != null) {
+      final models = _listHiddenDirs(templateRoot);
+      if (models.isNotEmpty) {
+        return models;
+      }
+    }
+
+    // Return the default list of known AI models
+    return _getKnownAIModels();
   }
 
   String? _findRemotionVideosRoot() {
@@ -429,28 +435,31 @@ class SkillManager {
     // Show AI models
     final models = discoverModelFolders();
     if (models.isEmpty) {
-      logger.error('No AI model folders could be discovered or created.');
-      return;
+      logger.warn('⚠️  No existing AI model folders found.');
+      logger.detail('Showing available AI model options for selection...');
     }
+    
+    // If empty, show all available template models instead
+    final availableModels = models.isNotEmpty ? models : _getKnownAIModels();
     
     logger.section('🤖 Target AI Models');
-    for (var i = 0; i < models.length; i++) {
-      final displayName = aiModelDisplayNames[models[i]] ?? models[i];
+    for (var i = 0; i < availableModels.length; i++) {
+      final displayName = aiModelDisplayNames[availableModels[i]] ?? availableModels[i];
       print('  ${i + 1}. $displayName');
     }
-    print('  ${models.length + 1}. All models');
+    print('  ${availableModels.length + 1}. All models');
     
-    stdout.write('\nSelect models (comma-separated numbers, or ${models.length + 1} for all): ');
+    stdout.write('\nSelect models (comma-separated numbers, or ${availableModels.length + 1} for all): ');
     final modelInput = stdin.readLineSync()?.trim() ?? '';
     
     List<String> selectedModels = [];
-    if (modelInput == '${models.length + 1}' || modelInput.toLowerCase() == 'all') {
-      selectedModels = models;
+    if (modelInput == '${availableModels.length + 1}' || modelInput.toLowerCase() == 'all') {
+      selectedModels = availableModels;
     } else {
       final indices = modelInput.split(',').map((i) => int.tryParse(i.trim()));
       for (final idx in indices) {
-        if (idx != null && idx > 0 && idx <= models.length) {
-          selectedModels.add(models[idx - 1]);
+        if (idx != null && idx > 0 && idx <= availableModels.length) {
+          selectedModels.add(availableModels[idx - 1]);
         }
       }
     }
