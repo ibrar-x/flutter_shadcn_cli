@@ -10,10 +10,16 @@
   - Cache location: `~/.flutter_shadcn/cache/{registryId}/index.json`
   - Use `--refresh` to force cache update from remote
 - **NEW**: Interactive AI skill manager with `install-skill` command.
+  - Works interactively by default - just run `flutter_shadcn install-skill` without flags
   - Auto-discovers AI model folders (`.claude`, `.gpt4`, `.cursor`, `.gemini`, etc.)
+  - **Shows human-readable model names** (e.g., "Cursor", "Claude (Anthropic)", "Codex (OpenAI)")
   - Interactive numbered menu for model selection
+  - **Only creates selected model folders**, not all template folders
   - Multiple installation modes: copy-per-model or install+symlink
   - List, uninstall, and symlink management for skills
+  - **skills.json discovery index** for browsing available skills (like index.json for components)
+  - `--available` / `-a` flag to list all available skills from registry
+  - `--interactive` / `-i` flag for multi-skill, multi-model batch installation
   - Automatically searches for skills in local registry (`shadcn_flutter_kit/flutter_shadcn_kit/skills/`)
   - **Requires `skill.json` or `skill.yaml` manifest** for installation (throws error if missing)
   - Parses manifest's `files` key to determine which files to copy

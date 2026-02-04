@@ -254,6 +254,7 @@ class SkillManager {
   /// Discovers all AI model folders in the project root.
   /// 
   /// Returns a list of folder names starting with '.' (e.g., .claude, .gpt4, .cursor).
+  /// Only returns folders that actually exist or offers to create them interactively.
   List<String> discoverModelFolders() {
     try {
       final projectDir = Directory(projectRoot);
@@ -262,21 +263,16 @@ class SkillManager {
       }
 
       final existing = _listHiddenDirs(projectRoot);
+      
+      // If we have existing model folders, return them
+      if (existing.isNotEmpty) {
+        return existing..sort();
+      }
+
+      // No existing folders - return template list WITHOUT creating them
+      // They will be created only when user selects them for installation
       final template = _findTemplateModels();
-      final merged = <String>{...existing, ...template}.toList()..sort();
-
-      if (merged.isEmpty) {
-        return [];
-      }
-
-      for (final model in merged) {
-        final modelDir = Directory(p.join(projectRoot, model));
-        if (!modelDir.existsSync()) {
-          modelDir.createSync(recursive: true);
-        }
-      }
-
-      return merged;
+      return template;
     } catch (e) {
       logger.error('Error discovering model folders: $e');
       return [];
