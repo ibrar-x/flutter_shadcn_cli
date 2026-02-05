@@ -220,19 +220,35 @@ class SkillManager {
     String? model,
   }) async {
     final uninstallPath = _getInstallPath(skillId, model);
-    final skillDir = Directory(uninstallPath);
+    
+    // Check if it's a symlink first
+    final link = Link(uninstallPath);
+    final directory = Directory(uninstallPath);
 
-    if (!skillDir.existsSync()) {
+    if (!link.existsSync() && !directory.existsSync()) {
       logger.error('Skill not found: $uninstallPath');
       throw Exception('Skill not installed: $skillId');
     }
 
     try {
-      await skillDir.delete(recursive: true);
-      if (model != null) {
-        logger.success('✓ Uninstalled "$skillId" for model: $model');
+      if (link.existsSync()) {
+        // It's a symlink - just remove the link, not the target
+        await link.delete();
+        final targetPath = await link.resolveSymbolicLinks();
+        final displayType = targetPath.isEmpty ? 'symlink' : 'symlink (to ${p.basename(targetPath)})';
+        if (model != null) {
+          logger.success('✓ Removed $displayType "$skillId" for model: $model');
+        } else {
+          logger.success('✓ Removed shared $displayType: $skillId');
+        }
       } else {
-        logger.success('✓ Uninstalled shared skill: $skillId');
+        // It's a real directory - delete it recursively
+        await directory.delete(recursive: true);
+        if (model != null) {
+          logger.success('✓ Uninstalled "$skillId" for model: $model');
+        } else {
+          logger.success('✓ Uninstalled shared skill: $skillId');
+        }
       }
     } catch (e) {
       logger.error('Failed to uninstall skill: $e');
