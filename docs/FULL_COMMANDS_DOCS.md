@@ -629,18 +629,25 @@ flutter_shadcn info button --registry local --registry-path /path/to/registry
 ## install-skill
 
 ### What it does
-Manages AI skills for model-specific installations. Auto-discovers hidden AI model folders (`.claude`, `.gpt4`, `.cursor`, `.gemini`, etc.) and installs skill documentation files from the local registry to enable AI-assisted component development. Supports both copying skills per-model and symlinking for efficiency.
+Intelligent multi-skill, multi-model AI skills manager. Auto-discovers 28+ hidden AI model folders (`.claude`, `.cursor`, `.gemini`, `.gpt4`, `.codex`, `.deepseek`, `.ollama`, etc.) and enables interactive installation/removal of skill documentation files from the registry. Supports efficient copy-per-model or install+symlink workflows with smart detection of existing installations.
 
 **Key responsibilities:**
-- Auto-discovers AI model folders in project root (20+ supported AI assistants)
+- Auto-discovers 28+ AI model folders in project root (Cursor, Claude, ChatGPT, Gemini, Code Llama, Mistral, Ollama, etc.)
+- **Default interactive mode** (no flags needed): prompts for skills and models, intelligently adapts based on what's installed
+- **Intelligent duplicate detection**: Scans which models have selected skills, offers skip/overwrite/cancel options
+- **Context-aware installation mode selection**: 
+  - Single model: copies directly
+  - Multiple models: detects existing installations and offers install+symlink option
+  - Shows only relevant options based on current state (no unnecessary prompts)
 - Finds skills in local registry (searches parent directories automatically)
 - Parses `skill.json` manifest to determine which files to copy
-- Interactive model selection (numbered menu)
+- **Smart model selection**: numbered menu with individual picks or "all models" option
 - Copies skill files maintaining directory structure
-- Creates symlinks from multiple models to a single skill installation
+- Creates symlinks from multiple models to single installation (saves disk space, ~50KB per skill)
+- **Interactive removal**: Menu-driven uninstall with multi-skill/multi-model batch support
 - Tracks installed skills per model with manifest files
-- Lists installed skills grouped by AI model
-- Supports uninstalling skills from specific models
+- Lists installed skills grouped by AI model with counts
+- Graceful error handling: batch operations skip missing folders instead of crashing
 
 **Files copied from skill:**
 - `SKILL.md` - Main skill documentation (AI instructions)
@@ -655,27 +662,46 @@ Manages AI skills for model-specific installations. Auto-discovers hidden AI mod
 - `references/schemas.md` - Component schema reference (CLI/dev use only)
 
 **Usage:**
-```bash
-# Interactive skill installation (prompts for skill ID and model selection)
-flutter_shadcn install-skill
 
-# Install specific skill to specific model
+#### Default Multi-Skill Interactive Mode (Recommended)
+```bash
+# Interactive: prompts for skill(s) and model(s), auto-detects what's installed
+# Shows human-readable model names ("Cursor", "Claude", etc.)
+# Intelligently asks about duplicate skills, installation mode, symlinks
+flutter_shadcn install-skill
+```
+
+#### Single Skill Installation
+```bash
+# Install specific skill to specific model (direct, no prompts)
 flutter_shadcn install-skill --skill flutter-shadcn-ui --model .claude
 
+# Install skill with interactive model selection menu
+flutter_shadcn install-skill --skill flutter-shadcn-ui
+```
+
+#### Removal
+```bash
+# Interactive removal menu: select skills and models, confirm before deletion
+flutter_shadcn install-skill --uninstall-interactive
+
+# Remove from specific model directly
+flutter_shadcn install-skill --uninstall flutter-shadcn-ui --model .claude
+```
+
+#### Advanced Options
+```bash
 # Install with custom skills URL/path
 flutter_shadcn install-skill --skill flutter-shadcn-ui --skills-url /path/to/skills
 
-# Install skill with interactive model selection
-flutter_shadcn install-skill --skill flutter-shadcn-ui
+# Create symlinks (for manual multi-model setup)
+flutter_shadcn install-skill --skill flutter-shadcn-ui --symlink --model .claude
 
-# List installed skills by model
+# List installed skills by model (shows which models have which skills)
 flutter_shadcn install-skill --list
 
-# Uninstall skill from specific model
-flutter_shadcn install-skill --uninstall flutter-shadcn-ui --model .claude
-
-# Create symlinks (install to .claude, then symlink to others)
-flutter_shadcn install-skill --skill flutter-shadcn-ui --symlink --model .claude
+# List available skills from registry
+flutter_shadcn install-skill --available
 
 # Show verbose output
 flutter_shadcn install-skill --verbose --skill flutter-shadcn-ui --model .claude
@@ -711,17 +737,79 @@ flutter_shadcn install-skill --verbose --skill flutter-shadcn-ui --model .claude
 
 ### Installation Modes
 
-1. **Copy per-model**: Copies skill files to each selected model independently. Ensures isolated installations.
-2. **Install + symlink**: Installs skill files once, creates symlinks from other model folders. Saves disk space (skill files ~50KB).
-3. **Selective symlink**: Install to primary model, manually choose which other models get symlinks vs. copies.
+**Automatic (Context-Aware - Default)**:
+The CLI intelligently selects the best mode based on what's already installed:
+
+1. **Single Model**: Copies skill files directly (no choice needed).
+2. **Multiple New Models**: Prompts between:
+   - Option 1: Copy to each model (always available)
+   - Option 2: Install once + symlink to others (offered if no existing installations)
+   - Option 3: Install to primary + symlink to others (always available)
+3. **Partial Existing Skills**: Detects which models already have skill
+   - For models without: asks same options as above (copy or symlink)
+   - For models with: offers skip/overwrite/cancel before proceeding
+4. **Existing Installation Detected**: If skill exists elsewhere, offers to use as symlink source
+   - Saves disk space by avoiding duplicate files
+   - Single source of truth for updates
+
+**Manual Flags** (for scripting):
+- `--symlink`: Force symlink mode
+- `--model <name>`: Specify target model (can combine with --symlink for manual setup)
 
 ### Skill Discovery Algorithm
 
 The CLI searches for skills in this order:
-1. `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}` - Traverses up from project root
-2. Parent directories: `../skills/{skillId}` - Searches up directory tree
-3. Project root: `./skills/{skillId}` - Local skills folder
-4. Fallback: Creates placeholder if skill not found locally
+1. Local registry in kit: `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}` (searches up from project root)
+2. Parent directories: `../skills/{skillId}` (recursively searches up directory tree)
+3. Project root: `./skills/{skillId}` (local skills folder in project)
+4. Custom URL: If `--skills-url` specified, tries that path first
+5. Error: Throws helpful error if skill manifest not found (skill.json or skill.yaml required)
+
+### Multi-Skill, Multi-Model Workflow Example
+
+Here's what happens when you run `flutter_shadcn install-skill` with multiple models:
+
+1. **Skill Selection**: Menu lists available skills
+   - Pick multiple skills (type numbers, comma-separated)
+   - Or type "a" for all available skills
+
+2. **Model Selection**: Menu lists discovered AI models with human-readable names
+   - Example:
+     ```
+     1) Cursor
+     2) Claude (Anthropic)
+     3) OpenAI (Codex)
+     4) Google Gemini
+     5) Mistral AI
+     ...
+     28) All models
+     ```
+   - Pick models to install to (comma-separated numbers)
+
+3. **Duplicate Detection**: For each skill × model combination
+   - Checks if skill already exists in that model
+   - Shows summary: "button-skill in Cursor (INSTALLED), Claude (NEW)"
+   - Offers: Skip installed / Overwrite all / Cancel
+
+4. **Installation Mode** (if multiple models, no existing installations):
+   - Option 1: Copy button-skill to Cursor AND to Claude (2× copies, isolated)
+   - Option 2: Install button-skill to Cursor + symlink Claude→Cursor (saves space, single source)
+   - Option 3: Install button-skill to Cursor + symlink others (safest default)
+
+5. **Execution**: Copies/symlinks files, shows success/warning messages
+   - Symlinks marked clearly: "→ Cursor (symlink)"
+   - Real copies marked: "✓ Claude (copied)"
+   - Already existed: "⊘ Gemini (skipped)"
+
+### Symlink Safety
+
+- **Safe unlinking**: `--uninstall-interactive` detects symlinks and removes only the link
+  - Source files in original model untouched
+  - Other models' symlinks still valid after deletion
+- **Batch operations**: Safely handles removing from all 28 models even if only 3 have the skill
+  - Missing folders skipped with warning
+  - Broken symlinks handled gracefully
+- **Reference integrity**: Can't delete skill referenced by another symlink without error (prevents accidental data loss)
 
 ---
 

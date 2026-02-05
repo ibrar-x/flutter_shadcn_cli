@@ -23,8 +23,16 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - Full cleanup on remove --all (components, composites, shared, config, empty folders).
 - **Component discovery**: list, search, and info commands with intelligent caching.
 - **Dry-run preview**: See dependencies, assets, and platform changes before install.
-- **AI skill manager**: Interactive installation with auto-discovery of model folders (.claude, .gpt4, .cursor, etc.).
-- **Symlink support**: Share skills across multiple AI models without duplicating files.
+- **AI skill manager**: Interactive multi-skill installation with auto-discovery of 28+ AI model folders (.claude, .cursor, .gemini, etc.).
+  - Human-readable model names (\"Cursor\", \"Claude (Anthropic)\", \"Codex (OpenAI)\")
+  - Install multiple skills to multiple models in one flow
+  - Intelligent duplicate detection (skip/overwrite/cancel installed skills)
+  - Context-aware installation modes: copy or symlink for efficiency
+  - Interactive removal with batch uninstall support
+- **Smart symlink management**: Share skills across multiple AI models without duplicating files.
+  - Auto-detects existing installations and offers symlink as option
+  - Safe removal that unlocks symlinks without deleting source files
+  - Batch operations with graceful error handling
 - **Schema validation**: Doctor validates components.json against components.schema.json.
 - **Version management**: Automatic update notifications (once per day) plus manual check and upgrade commands.
 
