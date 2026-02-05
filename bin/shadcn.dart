@@ -695,6 +695,8 @@ Future<void> main(List<String> arguments) async {
       if (skillCommand['help'] == true) {
         print('Usage: flutter_shadcn install-skill [--skill <id>] [--model <name>] [options]');
         print('');
+        print('\x1B[33m⚠️  EXPERIMENTAL - This command has not been fully tested yet. Use with caution.\x1B[0m');
+        print('');
         print('Manages AI skills for model-specific installations.');
         print('Discovers hidden AI model folders (.claude, .gpt4, .cursor, etc.) in project root.');
         print('');
@@ -883,7 +885,7 @@ void _printUsage() {
   print('  list           List available components');
   print('  search         Search for components');
   print('  info           Show component details');
-  print('  install-skill  Install AI skills');
+  print('  install-skill  Install AI skills (🧪 experimental)');
   print('  version        Show CLI version');
   print('  upgrade        Upgrade CLI to latest version');
   print('  doctor         Diagnose registry resolution');

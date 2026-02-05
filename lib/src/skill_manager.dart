@@ -159,6 +159,7 @@ class SkillManager {
   /// 
   /// Shows shared skills and per-model installations.
   Future<void> listSkills() async {
+    logger.warn('⚠️  EXPERIMENTAL: This feature has not been fully tested yet.');
     logger.section('📚 Installed Skills');
 
     final shared = <String>[];
@@ -388,6 +389,7 @@ class SkillManager {
 
   /// Lists available skills from skills.json index.
   Future<void> listAvailableSkills() async {
+    logger.warn('⚠️  EXPERIMENTAL: This feature has not been fully tested yet.');
     logger.section('📚 Available Skills');
     
     final loader = SkillsLoader(skillsBasePath: skillsBasePath);
@@ -416,6 +418,7 @@ class SkillManager {
   /// Shows available skills from skills.json and allows user to select
   /// which skills to install and to which models.
   Future<void> installSkillsInteractive() async {
+    logger.warn('⚠️  EXPERIMENTAL: This feature has not been fully tested yet.');
     final loader = SkillsLoader(skillsBasePath: skillsBasePath);
     final index = await loader.load();
     
@@ -663,6 +666,7 @@ class SkillManager {
   /// Shows numbered menu of available AI models and guides user through
   /// selection and installation mode choice.
   Future<void> installSkillInteractive({required String skillId}) async {
+    logger.warn('⚠️  EXPERIMENTAL: This feature has not been fully tested yet.');
     final models = discoverModelFolders();
     
     if (models.isEmpty) {
