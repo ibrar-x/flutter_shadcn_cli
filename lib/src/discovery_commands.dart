@@ -36,18 +36,38 @@ Future<void> handleListCommand({
       byCategory.putIfAbsent(comp.category, () => []).add(comp);
     }
 
-    // Print grouped
-    for (final category in byCategory.keys) {
-      logger.section(category);
-      for (final comp in byCategory[category]!) {
-        print('  ${comp.id.padRight(20)} ${comp.name}');
+    // Print grouped with beautiful formatting
+    final sortedCategories = byCategory.keys.toList()..sort();
+    
+    for (final category in sortedCategories) {
+      // Category header with emoji
+      final categoryEmoji = _getCategoryEmoji(category);
+      print('');
+      print('$categoryEmoji  \x1B[1m${category.toUpperCase()}\x1B[0m');
+      print('─' * 60);
+      
+      final categoryComponents = byCategory[category]!;
+      for (var i = 0; i < categoryComponents.length; i++) {
+        final comp = categoryComponents[i];
+        final isLast = i == categoryComponents.length - 1;
+        
+        // Component name with box drawing
+        final prefix = isLast ? '└─' : '├─';
+        print('  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
+        
+        // Description with subtle color
         if (comp.description.isNotEmpty) {
-          print('    ${comp.description}');
+          final descPrefix = isLast ? '   ' : '│  ';
+          final wrappedDesc = _wrapText(comp.description, 56);
+          for (final line in wrappedDesc) {
+            print('  $descPrefix \x1B[90m$line\x1B[0m');
+          }
         }
       }
-      print('');
     }
 
+    print('');
+    print('═' * 60);
     logger.info('${components.length} components total.');
   } catch (e) {
     logger.error('Failed to load components: $e');
@@ -238,4 +258,52 @@ Future<void> handleInfoCommand({
     logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
     return;
   }
+}
+
+/// Returns an emoji for each category
+String _getCategoryEmoji(String category) {
+  switch (category.toLowerCase()) {
+    case 'layout':
+      return '📐';
+    case 'overlay':
+      return '🎭';
+    case 'utility':
+      return '🔧';
+    case 'form':
+      return '📝';
+    case 'display':
+      return '💎';
+    case 'navigation':
+      return '🧭';
+    case 'control':
+      return '🎮';
+    case 'animation':
+      return '✨';
+    default:
+      return '📦';
+  }
+}
+
+/// Wraps text to a maximum width
+List<String> _wrapText(String text, int maxWidth) {
+  final words = text.split(' ');
+  final lines = <String>[];
+  var currentLine = '';
+
+  for (final word in words) {
+    if (currentLine.isEmpty) {
+      currentLine = word;
+    } else if ((currentLine.length + word.length + 1) <= maxWidth) {
+      currentLine += ' $word';
+    } else {
+      lines.add(currentLine);
+      currentLine = word;
+    }
+  }
+
+  if (currentLine.isNotEmpty) {
+    lines.add(currentLine);
+  }
+
+  return lines.isEmpty ? [''] : lines;
 }
