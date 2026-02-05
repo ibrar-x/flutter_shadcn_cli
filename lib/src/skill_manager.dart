@@ -262,15 +262,8 @@ class SkillManager {
         return [];
       }
 
-      final existing = _listHiddenDirs(projectRoot);
-      
-      // If we have existing model folders, return them
-      if (existing.isNotEmpty) {
-        return existing..sort();
-      }
-
-      // No existing folders - return template list WITHOUT creating them
-      // They will be created only when user selects them for installation
+      // Always return the full template list so users can install to any model
+      // Existing folders will simply be reused/overwritten
       final template = _findTemplateModels();
       return template;
     } catch (e) {
