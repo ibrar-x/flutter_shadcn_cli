@@ -117,16 +117,31 @@ Future<void> handleSearchCommand({
     // Sort by relevance score
     components.sort((a, b) => b.relevanceScore(query).compareTo(a.relevanceScore(query)));
 
-    for (final comp in components) {
+    print('');
+    for (var i = 0; i < components.length; i++) {
+      final comp = components[i];
       final score = comp.relevanceScore(query);
-      final scoreBar = '█' * ((score / 10).ceil().clamp(0, 10));
-      print('  ${comp.id.padRight(20)} ${comp.name}');
-      print('    ${comp.description}');
-      print('    Tags: ${comp.tags.join(", ")}');
-      print('    Relevance: $scoreBar ($score)');
-      print('');
+      final scoreBar = '\x1B[32m${'█' * ((score / 10).ceil().clamp(0, 10))}\x1B[0m';
+      final isLast = i == components.length - 1;
+      final prefix = isLast ? '└─' : '├─';
+      
+      print('  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
+      if (comp.description.isNotEmpty) {
+        final descPrefix = isLast ? '   ' : '│  ';
+        print('  $descPrefix \x1B[90m${comp.description}\x1B[0m');
+      }
+      if (comp.tags.isNotEmpty) {
+        final tagsPrefix = isLast ? '   ' : '│  ';
+        print('  $tagsPrefix \x1B[35m🏷️  ${comp.tags.join(", ")}\x1B[0m');
+      }
+      final scorePrefix = isLast ? '   ' : '│  ';
+      print('  $scorePrefix $scoreBar \x1B[90m($score pts)\x1B[0m');
+      
+      if (!isLast) print('  │');
     }
 
+    print('');
+    print('═' * 60);
     logger.info('Found ${components.length} matching components.');
   } catch (e) {
     logger.error('Failed to search components: $e');
@@ -170,60 +185,60 @@ Future<void> handleInfoCommand({
 
     logger.section('📋 Component: ${comp.name}');
     print('');
-    print('  ID:           ${comp.id}');
-    print('  Name:         ${comp.name}');
-    print('  Category:     ${comp.category}');
-    print('  Description:  ${comp.description}');
+    print('  \x1B[1mID:\x1B[0m           \x1B[36m${comp.id}\x1B[0m');
+    print('  \x1B[1mName:\x1B[0m         ${comp.name}');
+    print('  \x1B[1mCategory:\x1B[0m     \x1B[35m${_getCategoryEmoji(comp.category)} ${comp.category}\x1B[0m');
+    print('  \x1B[1mDescription:\x1B[0m  \x1B[90m${comp.description}\x1B[0m');
     print('');
 
     if (comp.tags.isNotEmpty) {
-      print('  Tags:');
+      print('  \x1B[1mTags:\x1B[0m');
       for (final tag in comp.tags) {
-        print('    • $tag');
+        print('    \x1B[35m🏷️  $tag\x1B[0m');
       }
       print('');
     }
 
     if (comp.install.isNotEmpty) {
-      print('  Install:      ${comp.install}');
+      print('  \x1B[1mInstall:\x1B[0m      \x1B[32m${comp.install}\x1B[0m');
     }
     if (comp.import_.isNotEmpty) {
-      print('  Import:       ${comp.import_}');
+      print('  \x1B[1mImport:\x1B[0m       \x1B[90m${comp.import_}\x1B[0m');
     }
     if (comp.importPath.isNotEmpty) {
-      print('  Import Path:  ${comp.importPath}');
+      print('  \x1B[1mImport Path:\x1B[0m  \x1B[90m${comp.importPath}\x1B[0m');
     }
     print('');
 
     if (comp.api.isNotEmpty) {
-      print('  API:');
+      print('  \x1B[1mAPI:\x1B[0m');
       final constructors = comp.api['constructors'] as List? ?? [];
       final callbacks = comp.api['callbacks'] as List? ?? [];
       if (constructors.isNotEmpty) {
-        print('    Constructors:');
+        print('    \x1B[1mConstructors:\x1B[0m');
         for (final c in constructors) {
-          print('      • $c');
+          print('      \x1B[33m▸\x1B[0m $c');
         }
       }
       if (callbacks.isNotEmpty) {
-        print('    Callbacks:');
+        print('    \x1B[1mCallbacks:\x1B[0m');
         for (final cb in callbacks) {
-          print('      • $cb');
+          print('      \x1B[33m▸\x1B[0m $cb');
         }
       }
       print('');
     }
 
     if (comp.examples.isNotEmpty) {
-      print('  Examples:');
+      print('  \x1B[1mExamples:\x1B[0m');
       for (final entry in comp.examples.entries) {
         final label = entry.key;
         final value = entry.value;
-        print('    • $label');
+        print('    \x1B[32m●\x1B[0m \x1B[1m$label\x1B[0m');
         if (value is String && value.trim().isNotEmpty) {
           final lines = value.trimRight().split('\n');
           for (final line in lines) {
-            print('      $line');
+            print('      \x1B[90m$line\x1B[0m');
           }
         }
       }
@@ -231,25 +246,25 @@ Future<void> handleInfoCommand({
     }
 
     if ((comp.dependencies['shared'] as List?)?.isNotEmpty ?? false) {
-      print('  Shared Dependencies:');
+      print('  \x1B[1mShared Dependencies:\x1B[0m');
       for (final dep in comp.dependencies['shared'] as List) {
-        print('    • $dep');
+        print('    \x1B[34m📦\x1B[0m $dep');
       }
       print('');
     }
 
     if ((comp.dependencies['pubspec'] as Map?)?.isNotEmpty ?? false) {
-      print('  Package Dependencies:');
+      print('  \x1B[1mPackage Dependencies:\x1B[0m');
       for (final dep in (comp.dependencies['pubspec'] as Map).keys) {
-        print('    • $dep');
+        print('    \x1B[34m📦\x1B[0m $dep');
       }
       print('');
     }
 
     if (comp.related.isNotEmpty) {
-      print('  Related:');
+      print('  \x1B[1mRelated:\x1B[0m');
       for (final rel in comp.related) {
-        print('    • $rel');
+        print('    \x1B[35m→\x1B[0m $rel');
       }
       print('');
     }

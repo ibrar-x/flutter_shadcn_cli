@@ -193,18 +193,19 @@ class SkillManager {
     }
 
     if (shared.isNotEmpty) {
-      print('\n  Shared Skills:');
+      print('\n  \x1B[1m📚 Shared Skills:\x1B[0m');
       for (final skill in shared) {
-        print('    • $skill');
+        print('    \x1B[36m●\x1B[0m $skill');
       }
     }
 
     if (models.isNotEmpty) {
-      print('\n  Model-Specific Skills:');
+      print('\n  \x1B[1m🤖 Model-Specific Skills:\x1B[0m');
       for (final model in models.keys) {
-        print('    $model:');
+        final displayName = aiModelDisplayNames[model] ?? model;
+        print('    \x1B[35m▸\x1B[0m \x1B[1m$displayName\x1B[0m');
         for (final skill in models[model]!) {
-          print('      • $skill');
+          print('      \x1B[90m─\x1B[0m $skill');
         }
       }
     }
@@ -401,9 +402,9 @@ class SkillManager {
     print('');
     for (var i = 0; i < index.skills.length; i++) {
       final skill = index.skills[i];
-      print('  ${i + 1}. ${skill.name} (${skill.id})');
-      print('     ${skill.description}');
-      print('     Version: ${skill.version} | Status: ${skill.status}');
+      print('  \x1B[36m${i + 1}.\x1B[0m \x1B[1m${skill.name}\x1B[0m \x1B[90m(${skill.id})\x1B[0m');
+      print('     \x1B[90m${skill.description}\x1B[0m');
+      print('     \x1B[35m📌 Version: ${skill.version}\x1B[0m \x1B[90m|\x1B[0m \x1B[33m⚡ Status: ${skill.status}\x1B[0m');
       if (i < index.skills.length - 1) print('');
     }
     print('');
@@ -428,11 +429,11 @@ class SkillManager {
     logger.section('📚 Available Skills');
     for (var i = 0; i < index.skills.length; i++) {
       final skill = index.skills[i];
-      print('  ${i + 1}. ${skill.name} - ${skill.description}');
+      print('  \x1B[36m${i + 1}.\x1B[0m \x1B[1m${skill.name}\x1B[0m \x1B[90m- ${skill.description}\x1B[0m');
     }
-    print('  ${index.skills.length + 1}. All skills');
+    print('  \x1B[33m${index.skills.length + 1}. 🌟 All skills\x1B[0m');
     
-    stdout.write('\nSelect skills to install (comma-separated numbers, or ${index.skills.length + 1} for all): ');
+    stdout.write('\n\x1B[1m❯\x1B[0m Select skills to install (comma-separated numbers, or ${index.skills.length + 1} for all): ');
     final input = stdin.readLineSync()?.trim() ?? '';
     
     List<SkillEntry> selectedSkills = [];
@@ -465,11 +466,11 @@ class SkillManager {
     logger.section('🤖 Target AI Models');
     for (var i = 0; i < availableModels.length; i++) {
       final displayName = aiModelDisplayNames[availableModels[i]] ?? availableModels[i];
-      print('  ${i + 1}. $displayName');
+      print('  \x1B[36m${i + 1}.\x1B[0m \x1B[1m$displayName\x1B[0m');
     }
-    print('  ${availableModels.length + 1}. All models');
+    print('  \x1B[33m${availableModels.length + 1}. 🌟 All models\x1B[0m');
     
-    stdout.write('\nSelect models (comma-separated numbers, or ${availableModels.length + 1} for all): ');
+    stdout.write('\n\x1B[1m❯\x1B[0m Select models (comma-separated numbers, or ${availableModels.length + 1} for all): ');
     final modelInput = stdin.readLineSync()?.trim() ?? '';
     
     List<String> selectedModels = [];
@@ -518,15 +519,15 @@ class SkillManager {
         final installed = alreadyInstalled[skill.id]!;
         if (installed.isNotEmpty) {
           final displayNames = installed.map((m) => aiModelDisplayNames[m] ?? m).join(', ');
-          print('  "${skill.name}" is already installed in: $displayNames');
+          print('  \x1B[33m⚡\x1B[0m \x1B[1m${skill.name}\x1B[0m is already in: \x1B[36m$displayNames\x1B[0m');
         }
       }
       print('');
-      print('What would you like to do?');
-      print('  1. Skip already installed models (install to new models only)');
-      print('  2. Overwrite all selected models');
-      print('  3. Cancel installation');
-      stdout.write('\nSelect option (1, 2, or 3): ');
+      print('\x1B[1mWhat would you like to do?\x1B[0m');
+      print('  \x1B[36m1.\x1B[0m Skip already installed models (install to new models only)');
+      print('  \x1B[36m2.\x1B[0m Overwrite all selected models');
+      print('  \x1B[31m3.\x1B[0m Cancel installation');
+      stdout.write('\n\x1B[1m❯\x1B[0m Select option (1, 2, or 3): ');
       final overwriteInput = stdin.readLineSync()?.trim() ?? '';
       
       if (overwriteInput == '3') {
@@ -567,22 +568,22 @@ class SkillManager {
       }
       
       logger.section('📦 Installation Mode');
-      print('You selected ${selectedModels.length} models.');
+      print('You selected \x1B[1m${selectedModels.length}\x1B[0m models.');
       print('');
       
       // Build installation options based on existing installations
       final options = <String>[
-        '1. Copy skill files to each model folder',
-        if (existingWithFiles.isNotEmpty) '2. Symlink all models to an existing installation',
-        '${existingWithFiles.isNotEmpty ? 3 : 2}. Install to one new model and symlink to others',
+        '\x1B[36m1.\x1B[0m Copy skill files to each model folder',
+        if (existingWithFiles.isNotEmpty) '\x1B[36m2.\x1B[0m Symlink all models to an existing installation',
+        '\x1B[36m${existingWithFiles.isNotEmpty ? 3 : 2}.\x1B[0m Install to one new model and symlink to others',
       ];
       
-      print('Choose installation method:');
+      print('\x1B[1mChoose installation method:\x1B[0m');
       for (final option in options) {
         print('  $option');
       }
       
-      stdout.write('\nSelect mode (${existingWithFiles.isNotEmpty ? '1-3' : '1-2'}): ');
+      stdout.write('\n\x1B[1m❯\x1B[0m Select mode (${existingWithFiles.isNotEmpty ? '1-3' : '1-2'}): ');
       final modeInput = stdin.readLineSync()?.trim() ?? '';
       
       if (modeInput == '2' && existingWithFiles.isNotEmpty) {
@@ -592,9 +593,9 @@ class SkillManager {
         print('These models already have the skill files:');
         for (var i = 0; i < existingWithFiles.length; i++) {
           final displayName = aiModelDisplayNames[existingWithFiles[i]] ?? existingWithFiles[i];
-          print('  ${i + 1}. $displayName');
+          print('  \x1B[36m${i + 1}.\x1B[0m \x1B[1m$displayName\x1B[0m');
         }
-        stdout.write('\nSelect source model: ');
+        stdout.write('\n\x1B[1m❯\x1B[0m Select source model: ');
         final sourceInput = stdin.readLineSync()?.trim() ?? '';
         final sourceIdx = int.tryParse(sourceInput);
         
