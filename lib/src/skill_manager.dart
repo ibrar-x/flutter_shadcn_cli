@@ -528,16 +528,61 @@ class SkillManager {
     bool useSymlinks = false;
     
     if (selectedModels.length > 1) {
+      // Check for existing installations among already-installed models
+      final existingWithFiles = <String>[];
+      for (final skill in selectedSkills) {
+        for (final model in alreadyInstalled[skill.id]!) {
+          final skillDir = Directory(p.join(projectRoot, model, 'skills', skill.id));
+          if (skillDir.existsSync() && !existingWithFiles.contains(model)) {
+            existingWithFiles.add(model);
+          }
+        }
+      }
+      
       logger.section('📦 Installation Mode');
       print('You selected ${selectedModels.length} models.');
       print('');
+      
+      // Build installation options based on existing installations
+      final options = <String>[
+        '1. Copy skill files to each model folder',
+        if (existingWithFiles.isNotEmpty) '2. Symlink all models to an existing installation',
+        '${existingWithFiles.isNotEmpty ? 3 : 2}. Install to one new model and symlink to others',
+      ];
+      
       print('Choose installation method:');
-      print('  1. Copy skill files to each model folder');
-      print('  2. Install to one model and symlink to others');
-      stdout.write('\nSelect mode (1 or 2): ');
+      for (final option in options) {
+        print('  $option');
+      }
+      
+      stdout.write('\nSelect mode (${existingWithFiles.isNotEmpty ? '1-3' : '1-2'}): ');
       final modeInput = stdin.readLineSync()?.trim() ?? '';
       
-      if (modeInput == '2') {
+      if (modeInput == '2' && existingWithFiles.isNotEmpty) {
+        // Use existing installation as symlink source
+        useSymlinks = true;
+        logger.section('🔗 Select Source for Symlinks');
+        print('These models already have the skill files:');
+        for (var i = 0; i < existingWithFiles.length; i++) {
+          final displayName = aiModelDisplayNames[existingWithFiles[i]] ?? existingWithFiles[i];
+          print('  ${i + 1}. $displayName');
+        }
+        stdout.write('\nSelect source model: ');
+        final sourceInput = stdin.readLineSync()?.trim() ?? '';
+        final sourceIdx = int.tryParse(sourceInput);
+        
+        if (sourceIdx != null && sourceIdx > 0 && sourceIdx <= existingWithFiles.length) {
+          primaryModel = existingWithFiles[sourceIdx - 1];
+          // Only symlink to models that don't have it yet
+          selectedModels = selectedModels
+              .where((m) => !alreadyInstalled.values.any((models) => models.contains(m)))
+              .toList();
+        } else {
+          logger.error('Invalid selection.');
+          return;
+        }
+      } else if ((modeInput == '2' && existingWithFiles.isEmpty) || modeInput == '3') {
+        // Install to new primary and symlink to others
         useSymlinks = true;
         logger.section('🎯 Primary Installation Target');
         print('Select which model to install the skill files into:');
