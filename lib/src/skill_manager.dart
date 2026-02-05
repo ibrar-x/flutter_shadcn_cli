@@ -462,6 +462,67 @@ class SkillManager {
       return;
     }
     
+    // Check which models already have these skills installed
+    final alreadyInstalled = <String, List<String>>{}; // skillId -> [models]
+    final notInstalled = <String, List<String>>{}; // skillId -> [models]
+    
+    for (final skill in selectedSkills) {
+      alreadyInstalled[skill.id] = [];
+      notInstalled[skill.id] = [];
+      
+      for (final model in selectedModels) {
+        final modelDir = Directory(p.join(projectRoot, model));
+        final skillDir = Directory(p.join(modelDir.path, 'skills', skill.id));
+        
+        if (skillDir.existsSync()) {
+          alreadyInstalled[skill.id]!.add(model);
+        } else {
+          notInstalled[skill.id]!.add(model);
+        }
+      }
+    }
+    
+    // Check if any skills are already installed in any selected models
+    final hasAnyInstalled = alreadyInstalled.values.any((models) => models.isNotEmpty);
+    
+    if (hasAnyInstalled) {
+      logger.section('⚠️  Existing Installations Detected');
+      for (final skill in selectedSkills) {
+        final installed = alreadyInstalled[skill.id]!;
+        if (installed.isNotEmpty) {
+          final displayNames = installed.map((m) => aiModelDisplayNames[m] ?? m).join(', ');
+          print('  "${skill.name}" is already installed in: $displayNames');
+        }
+      }
+      print('');
+      print('What would you like to do?');
+      print('  1. Skip already installed models (install to new models only)');
+      print('  2. Overwrite all selected models');
+      print('  3. Cancel installation');
+      stdout.write('\nSelect option (1, 2, or 3): ');
+      final overwriteInput = stdin.readLineSync()?.trim() ?? '';
+      
+      if (overwriteInput == '3') {
+        logger.info('Installation cancelled.');
+        return;
+      } else if (overwriteInput == '1') {
+        // Filter to only install to models that don't have the skill
+        final modelsToInstall = <String>{};
+        for (final skill in selectedSkills) {
+          modelsToInstall.addAll(notInstalled[skill.id]!);
+        }
+        
+        if (modelsToInstall.isEmpty) {
+          logger.info('All selected models already have these skills installed.');
+          return;
+        }
+        
+        selectedModels = modelsToInstall.toList()..sort();
+        logger.info('Installing to ${selectedModels.length} new model(s)...');
+      }
+      // If overwriteInput == '2', continue with all selectedModels
+    }
+    
     // If multiple models selected, ask about installation mode
     String? primaryModel;
     bool useSymlinks = false;
