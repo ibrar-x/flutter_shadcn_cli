@@ -225,23 +225,34 @@ class SkillManager {
     final link = Link(uninstallPath);
     final directory = Directory(uninstallPath);
 
+    // Skip if doesn't exist (might be in a removed folder)
     if (!link.existsSync() && !directory.existsSync()) {
-      logger.error('Skill not found: $uninstallPath');
-      throw Exception('Skill not installed: $skillId');
+      logger.warn('⚠️  Skill not found: $uninstallPath (skipping)');
+      return;
     }
 
     try {
       if (link.existsSync()) {
-        // It's a symlink - just remove the link, not the target
+        // It's a symlink - resolve BEFORE deleting
+        String targetPath = '';
+        try {
+          targetPath = await link.resolveSymbolicLinks();
+        } catch (_) {
+          // Broken symlink - just delete it
+          targetPath = '';
+        }
+        
         await link.delete();
-        final targetPath = await link.resolveSymbolicLinks();
-        final displayType = targetPath.isEmpty ? 'symlink' : 'symlink (to ${p.basename(targetPath)})';
+        
+        final displayType = targetPath.isNotEmpty 
+            ? 'symlink (to ${p.basename(targetPath)})'
+            : 'symlink';
         if (model != null) {
           logger.success('✓ Removed $displayType "$skillId" for model: $model');
         } else {
           logger.success('✓ Removed shared $displayType: $skillId');
         }
-      } else {
+      } else if (directory.existsSync()) {
         // It's a real directory - delete it recursively
         await directory.delete(recursive: true);
         if (model != null) {
