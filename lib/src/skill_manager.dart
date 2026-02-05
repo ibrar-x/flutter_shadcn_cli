@@ -469,10 +469,62 @@ class SkillManager {
       return;
     }
     
-    // Install each skill to each model
+    // If multiple models selected, ask about installation mode
+    String? primaryModel;
+    bool useSymlinks = false;
+    
+    if (selectedModels.length > 1) {
+      logger.section('📦 Installation Mode');
+      print('You selected ${selectedModels.length} models.');
+      print('');
+      print('Choose installation method:');
+      print('  1. Copy skill files to each model folder');
+      print('  2. Install to one model and symlink to others');
+      stdout.write('\nSelect mode (1 or 2): ');
+      final modeInput = stdin.readLineSync()?.trim() ?? '';
+      
+      if (modeInput == '2') {
+        useSymlinks = true;
+        logger.section('🎯 Primary Installation Target');
+        print('Select which model to install the skill files into:');
+        for (var i = 0; i < selectedModels.length; i++) {
+          final displayName = aiModelDisplayNames[selectedModels[i]] ?? selectedModels[i];
+          print('  ${i + 1}. $displayName');
+        }
+        stdout.write('\nSelect primary model: ');
+        final primaryInput = stdin.readLineSync()?.trim() ?? '';
+        final primaryIdx = int.tryParse(primaryInput);
+        
+        if (primaryIdx != null && primaryIdx > 0 && primaryIdx <= selectedModels.length) {
+          primaryModel = selectedModels[primaryIdx - 1];
+        } else {
+          logger.error('Invalid selection.');
+          return;
+        }
+      }
+    }
+    
+    // Install each skill
     for (final skill in selectedSkills) {
-      for (final model in selectedModels) {
-        await installSkill(skillId: skill.id, model: model);
+      if (useSymlinks && primaryModel != null) {
+        // Install to primary model first
+        await installSkill(skillId: skill.id, model: primaryModel);
+        
+        // Create symlinks for other models
+        for (final model in selectedModels) {
+          if (model != primaryModel) {
+            await symlinkSkill(
+              skillId: skill.id,
+              targetModel: primaryModel,
+              model: model,
+            );
+          }
+        }
+      } else {
+        // Copy to each model
+        for (final model in selectedModels) {
+          await installSkill(skillId: skill.id, model: model);
+        }
       }
     }
     
