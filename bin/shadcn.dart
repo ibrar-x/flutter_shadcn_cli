@@ -145,7 +145,8 @@ Future<void> main(List<String> arguments) async {
         ..addFlag('list', negatable: false, help: 'List installed skills')
         ..addFlag('available', abbr: 'a', negatable: false, help: 'List available skills from registry')
         ..addFlag('interactive', abbr: 'i', negatable: false, help: 'Interactive multi-skill installation')
-        ..addOption('uninstall', help: 'Uninstall skill')
+        ..addOption('uninstall', help: 'Uninstall skill (specify --model for single removal)')
+        ..addFlag('uninstall-interactive', negatable: false, help: 'Interactive removal (choose skills and models)')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -706,6 +707,7 @@ Future<void> main(List<String> arguments) async {
         print('  --skills-url           Override skills base URL/path (defaults to registry URL)');
         print('  --symlink --model      Create symlinks from source model to other models');
         print('  --uninstall <id>       Remove skill from specific model (requires --model)');
+        print('  --uninstall-interactive Remove skills (interactive: choose skills and models)');
         print('');
         print('Default Interactive Installation Flow:');
         print('  1. Shows all available skills from skills.json');
@@ -717,12 +719,19 @@ Future<void> main(List<String> arguments) async {
         print('     - Install to one model, symlink to others');
         print('  6. Creates skill folder structure in selected models');
         print('');
+        print('Interactive Uninstall Flow (--uninstall-interactive):');
+        print('  1. Shows all installed skills');
+        print('  2. Select which skills to remove');
+        print('  3. Select which models to remove from');
+        print('  4. Confirm removal before proceeding');
+        print('');
         print('Examples:');
         print('  flutter_shadcn install-skill                    # Default: multi-skill interactive');
         print('  flutter_shadcn install-skill --available        # List available skills from registry');
         print('  flutter_shadcn install-skill --skill my-skill   # Install single skill, pick models');
         print('  flutter_shadcn install-skill --list             # Show installed skills by model');
-        print('  flutter_shadcn install-skill --skill my-skill --model .claude  # Install to specific model');
+        print('  flutter_shadcn install-skill --uninstall-interactive  # Remove skills (interactive menu)');
+        print('  flutter_shadcn install-skill --uninstall flutter-shadcn-ui --model .claude  # Remove from one model');
         exit(0);
       }
 
@@ -746,13 +755,15 @@ Future<void> main(List<String> arguments) async {
         await skillMgr.listAvailableSkills();
       } else if (skillCommand['list'] == true) {
         await skillMgr.listSkills();
+      } else if (skillCommand['uninstall-interactive'] == true) {
+        await skillMgr.uninstallSkillsInteractive();
       } else if (skillCommand.wasParsed('uninstall')) {
         final skillId = skillCommand['uninstall'] as String;
         final model = skillCommand.wasParsed('model')
             ? skillCommand['model'] as String?
             : null;
         if (model == null) {
-          logger.error('--uninstall requires --model');
+          logger.error('--uninstall requires --model, or use --uninstall-interactive for menu');
           exit(1);
         }
         await skillMgr.uninstallSkill(skillId: skillId, model: model);

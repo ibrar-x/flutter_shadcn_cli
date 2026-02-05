@@ -702,6 +702,126 @@ class SkillManager {
     }
   }
 
+  /// Interactive uninstall flow.
+  /// 
+  /// Shows menu of installed skills and models, letting user choose what to remove.
+  Future<void> uninstallSkillsInteractive() async {
+    // Get list of installed skills
+    final installedSkills = <String, Set<String>>{}; // skillId -> {models}
+    
+    final models = discoverModelFolders();
+    for (final model in models) {
+      final skillsDir = Directory(p.join(projectRoot, model, 'skills'));
+      if (skillsDir.existsSync()) {
+        for (final entity in skillsDir.listSync()) {
+          if (entity is Directory) {
+            final skillId = p.basename(entity.path);
+            installedSkills.putIfAbsent(skillId, () => {}).add(model);
+          }
+        }
+      }
+    }
+    
+    if (installedSkills.isEmpty) {
+      logger.info('No skills currently installed.');
+      return;
+    }
+    
+    // Show installed skills
+    logger.section('📚 Installed Skills');
+    final skillList = installedSkills.keys.toList()..sort();
+    for (var i = 0; i < skillList.length; i++) {
+      final skill = skillList[i];
+      final modelCount = installedSkills[skill]!.length;
+      print('  ${i + 1}. $skill (installed in $modelCount model${modelCount == 1 ? '' : 's'})');
+    }
+    print('  ${skillList.length + 1}. All skills');
+    
+    stdout.write('\nSelect skills to remove (comma-separated numbers, or ${skillList.length + 1} for all): ');
+    final skillInput = stdin.readLineSync()?.trim() ?? '';
+    
+    List<String> selectedSkills = [];
+    if (skillInput == '${skillList.length + 1}' || skillInput.toLowerCase() == 'all') {
+      selectedSkills = skillList;
+    } else {
+      final indices = skillInput.split(',').map((i) => int.tryParse(i.trim()));
+      for (final idx in indices) {
+        if (idx != null && idx > 0 && idx <= skillList.length) {
+          selectedSkills.add(skillList[idx - 1]);
+        }
+      }
+    }
+    
+    if (selectedSkills.isEmpty) {
+      logger.error('No skills selected.');
+      return;
+    }
+    
+    // Collect all models where selected skills are installed
+    final modelsWithSelectedSkills = <String>{};
+    for (final skillId in selectedSkills) {
+      modelsWithSelectedSkills.addAll(installedSkills[skillId]!);
+    }
+    
+    final modelList = modelsWithSelectedSkills.toList()..sort();
+    
+    logger.section('🤖 Target AI Models');
+    for (var i = 0; i < modelList.length; i++) {
+      final displayName = aiModelDisplayNames[modelList[i]] ?? modelList[i];
+      print('  ${i + 1}. $displayName');
+    }
+    print('  ${modelList.length + 1}. All models');
+    
+    stdout.write('\nSelect models (comma-separated numbers, or ${modelList.length + 1} for all): ');
+    final modelInput = stdin.readLineSync()?.trim() ?? '';
+    
+    List<String> selectedModels = [];
+    if (modelInput == '${modelList.length + 1}' || modelInput.toLowerCase() == 'all') {
+      selectedModels = modelList;
+    } else {
+      final indices = modelInput.split(',').map((i) => int.tryParse(i.trim()));
+      for (final idx in indices) {
+        if (idx != null && idx > 0 && idx <= modelList.length) {
+          selectedModels.add(modelList[idx - 1]);
+        }
+      }
+    }
+    
+    if (selectedModels.isEmpty) {
+      logger.error('No models selected.');
+      return;
+    }
+    
+    // Confirm removal
+    logger.section('⚠️  Confirm Removal');
+    print('You are about to remove:');
+    print('  Skills: ${selectedSkills.join(', ')}');
+    print('  Models: ${selectedModels.map((m) => aiModelDisplayNames[m] ?? m).join(', ')}');
+    print('');
+    stdout.write('Are you sure? (yes/no): ');
+    final confirm = stdin.readLineSync()?.trim().toLowerCase() ?? '';
+    
+    if (confirm != 'yes' && confirm != 'y') {
+      logger.info('Removal cancelled.');
+      return;
+    }
+    
+    // Remove skills from selected models
+    int removedCount = 0;
+    for (final skill in selectedSkills) {
+      for (final model in selectedModels) {
+        try {
+          await uninstallSkill(skillId: skill, model: model);
+          removedCount++;
+        } catch (_) {
+          // Already logged in uninstallSkill
+        }
+      }
+    }
+    
+    logger.success('✓ Removed ${selectedSkills.length} skill(s) from ${selectedModels.length} model(s) ($removedCount total removals)');
+  }
+
   /// Downloads or copies skill files from source.
   /// 
   /// First tries local registry, then falls back to GitHub/remote.
