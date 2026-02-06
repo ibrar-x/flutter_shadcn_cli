@@ -4,7 +4,7 @@
 
 - (empty)
 
-## 0.1.9
+## 0.1.8
 
 ### 🧭 Registry & Schema
 - **IMPROVED**: components.json schema validation now uses JSON Schema with `$schema` resolution and local fallback to `components.schema.json`.
@@ -19,8 +19,6 @@
 
 ### 🧪 Tests
 - **NEW**: Integration tests validating CLI install behavior and schema validation.
-
-## 0.1.8
 
 ### 🎯 Component Discovery
 - **NEW**: Component discovery system with `list`, `search`, and `info` commands.
