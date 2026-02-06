@@ -63,7 +63,7 @@ flutter_shadcn init --yes \
 flutter_shadcn init --install-fonts --install-icons
 
 # One-line setup: init + add components
-flutter_shadcn init --add button dialog
+flutter_shadcn init button dialog
 flutter_shadcn init --all
 ```
 
@@ -1156,4 +1156,3 @@ install-skill ───→ Manages AI model folders
 5. **Use `dry-run` before `add`** to preview dependencies and understand scope.
 6. **Keep `components.schema.json` in sync** with registry updates for validation to work.
 7. **Use `--force` remove sparingly** - dependency checking prevents broken states.
-

@@ -35,6 +35,13 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
   - Batch operations with graceful error handling
 - **Schema validation**: Doctor validates components.json against components.schema.json.
 - **Version management**: Automatic update notifications (once per day) plus manual check and upgrade commands.
+- **Integrated feedback system**: Submit bugs, feature requests, or questions directly via GitHub.
+  - Interactive menu with 6 feedback types (bug, feature, docs, question, performance, other)
+  - Type-specific templates with relevant questions
+  - Auto-includes environment details (CLI version, OS, Dart SDK)
+  - Non-interactive mode for one-command submissions
+  - GitHub CLI integration (creates issues directly without browser if `gh` is installed)
+  - Automatic fallback to browser if GitHub CLI is unavailable
 
 ## Install (pub.dev)
 
@@ -139,7 +146,7 @@ flutter_shadcn remove --all
 Init and add in one command:
 
 ```bash
-flutter_shadcn init --add button dialog
+flutter_shadcn init button dialog
 ```
 
 Add everything:
@@ -198,7 +205,9 @@ Saved choices per project:
 - registryMode, registryPath, registryUrl
 
 The CLI also writes a local manifest at `<installPath>/components.json` with
-the list of installed Widgets.
+the list of installed Widgets and component metadata (version/tags). It also
+tracks per-component install manifests under `.shadcn/components/<id>.json`
+for auditing and upgrade workflows.
 
 ## Commands
 
@@ -534,8 +543,19 @@ The feedback command provides an interactive menu with the following options:
 The command will:
 1. Show an interactive menu of feedback types
 2. Collect your feedback details (title and description)
-3. Open GitHub with a pre-filled issue template
-4. Auto-include CLI version, OS, and Dart version
+3. **If GitHub CLI (`gh`) is installed**: Create issue directly in terminal
+4. **Otherwise**: Open GitHub with a pre-filled issue template in browser
+5. Auto-include CLI version, OS, and Dart version
+
+**GitHub CLI Integration:**
+If you have [GitHub CLI](https://cli.github.com/) installed and authenticated (`gh auth login`), issues are created instantly without leaving the terminal. Otherwise, the command falls back to opening your browser.
+
+**Non-interactive mode:**
+```bash
+flutter_shadcn feedback --type bug --title "Init fails on Windows" --body "Describe the issue"
+```
+
+Valid types: `bug`, `feature`, `docs`, `question`, `performance`, `other`
 
 All feedback goes to the [shadcn_flutter_kit](https://github.com/ibrar-x/shadcn_flutter_kit) repository and helps improve the toolkit for everyone!
 
@@ -619,7 +639,7 @@ If aliases are missing:
 - Symlink support for sharing skills across multiple AI models.
 - Skills URL override with `--skills-url`.
 - Doctor validates components.json schema and reports cache location.
-- One‑line setup with init --add/--all.
+- One‑line setup with init `<components>` or `--all`.
 - Local dev mode saved with --dev.
 - Optional file toggles (README.md, meta.json, preview.dart).
 - Folder alias support with @alias paths.
