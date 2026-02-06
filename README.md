@@ -514,6 +514,31 @@ Edit `.shadcn/config.json` and set:
 }
 ```
 
+### feedback
+
+Submit feedback, report bugs, or request features via GitHub:
+
+```bash
+flutter_shadcn feedback
+```
+
+The feedback command provides an interactive menu with the following options:
+
+- 🐛 **Report a bug** - Issues with components, installation, or CLI behavior
+- ✨ **Request a feature** - Ideas for new components or enhancements
+- 📖 **Documentation** - Suggestions for documentation improvements
+- ❓ **Ask a question** - Questions about usage or configuration
+- ⚡ **Performance issue** - Slow builds, runtime performance problems
+- 💡 **Other feedback** - General suggestions and ideas
+
+The command will:
+1. Show an interactive menu of feedback types
+2. Collect your feedback details (title and description)
+3. Open GitHub with a pre-filled issue template
+4. Auto-include CLI version, OS, and Dart version
+
+All feedback goes to the [shadcn_flutter_kit](https://github.com/ibrar-x/shadcn_flutter_kit) repository and helps improve the toolkit for everyone!
+
 ## Folder Path Aliases
 
 Set during init, for example:

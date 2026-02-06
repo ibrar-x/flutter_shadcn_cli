@@ -67,6 +67,14 @@
   - Cached in `~/.flutter_shadcn/cache/version_check.json`
   - Opt-out via `.shadcn/config.json`: set `"checkUpdates": false`
 
+### 💬 User Feedback
+- **NEW**: `feedback` command for submitting feedback and reporting issues.
+  - Interactive menu with 6 feedback categories (bug, feature, docs, question, performance, other)
+  - Opens GitHub with pre-filled issue templates
+  - Auto-includes CLI version, OS, and Dart version for better context
+  - Each feedback type has custom emoji, labels, and structured template
+  - Cross-platform browser opening (macOS, Linux, Windows)
+
 ### 🧪 Testing & Quality
 - **NEW**: Comprehensive test coverage for skill manager and version manager.
   - Skill discovery tests (local kit registry, parent directories, manifest requirement, YAML support)

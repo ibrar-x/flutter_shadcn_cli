@@ -21,6 +21,7 @@ This document provides comprehensive documentation for every command in `flutter
 13. [install-skill](#install-skill)
 14. [version](#version)
 15. [upgrade](#upgrade)
+16. [feedback](#feedback)
 
 ---
 
@@ -920,6 +921,109 @@ Edit `.shadcn/config.json`:
 - No manual checking required
 - Minimal network overhead (24-hour cache)
 - Non-intrusive (doesn't block commands)
+
+---
+
+## feedback
+
+### What it does
+Provides a structured way for users to submit feedback, report bugs, request features, or ask questions by opening pre-filled GitHub issues.
+
+**Key responsibilities:**
+- Shows interactive menu with 6 feedback categories
+- Collects feedback title and description from user
+- Builds GitHub issue URL with pre-filled template
+- Auto-includes CLI version, OS, and Dart SDK version
+- Opens default browser with the pre-filled issue
+- Applies appropriate labels based on feedback type
+
+**Usage:**
+```bash
+# Interactive feedback menu
+flutter_shadcn feedback
+
+# Show help
+flutter_shadcn feedback --help
+```
+
+### Feedback Categories
+
+| Category | Emoji | Template Includes | Labels Applied |
+|----------|-------|------------------|----------------|
+| **Bug Report** | 🐛 | Steps to reproduce, expected vs actual behavior, environment | `bug`, `needs-triage` |
+| **Feature Request** | ✨ | Problem statement, proposed solution, alternatives | `enhancement` |
+| **Documentation** | 📖 | Issue location, suggested improvements, examples | `documentation` |
+| **Question** | ❓ | Context, what was tried, expected outcome | `question` |
+| **Performance** | ⚡ | Performance impact, environment, reproduction steps | `performance`, `bug` |
+| **Other** | 💡 | General feedback and suggestions | `feedback` |
+
+### Files Used
+
+| File Path | Purpose | Why |
+|-----------|---------|-----|
+| `pubspec.yaml` (embedded) | CLI version for issue context | Helps maintainers know which version has the issue |
+| `Platform` class | OS detection | Different issues may be platform-specific |
+| `Platform.version` | Dart SDK version | Provides complete environment context |
+| Default browser executable | Opens GitHub issue URL | Creates issue in user's browser |
+
+### Why These Files
+
+- **pubspec.yaml (version)**: Essential context for bug reports; maintainers need to know which version the user is running.
+- **Platform info**: Issues may be OS-specific (e.g., path handling on Windows vs macOS); environment details aid debugging.
+- **Browser**: GitHub issues require authentication; opening in browser allows user to log in and submit.
+
+### Interactive Workflow
+
+1. **Menu Selection**
+   ```
+   Select feedback type:
+   🐛 1. Report a bug
+   ✨ 2. Request a feature
+   📖 3. Documentation improvement
+   ❓ 4. Ask a question
+   ⚡ 5. Performance issue
+   💡 6. Other feedback
+   ```
+
+2. **Title Collection**
+   ```
+   Enter a brief title for your bug report:
+   > Button component crashes on null theme
+   ```
+
+3. **Description Collection**
+   ```
+   Enter a detailed description:
+   > When initializing button without theme context...
+   ```
+
+4. **GitHub Issue Creation**
+   - Opens browser with pre-filled issue
+   - Title and body populated from user input
+   - Environment section auto-filled:
+     ```
+     **CLI Version**: 0.1.8
+     **OS**: macOS 14.2.1
+     **Dart SDK**: 3.3.0
+     ```
+   - Labels automatically applied
+   - User can edit before submitting
+
+### Platform Support
+
+| Platform | Browser Command |
+|----------|----------------|
+| macOS | `open <url>` |
+| Linux | `xdg-open <url>` |
+| Windows | `cmd /c start <url>` |
+
+### Benefits
+
+- **Structured feedback**: Templates ensure all necessary information is collected
+- **Time-saving**: Auto-fills environment details users might forget
+- **Better triage**: Labels help maintainers prioritize and route issues
+- **Lower barrier**: Simple interactive flow encourages user feedback
+- **Context-rich**: Version and platform info aids debugging
 
 ---
 

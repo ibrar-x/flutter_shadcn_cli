@@ -11,6 +11,7 @@ import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/discovery_commands.dart';
 import 'package:flutter_shadcn_cli/src/skill_manager.dart';
 import 'package:flutter_shadcn_cli/src/version_manager.dart';
+import 'package:flutter_shadcn_cli/src/feedback_manager.dart';
 
 Future<void> main(List<String> arguments) async {
   _ensureExecutablePath();
@@ -159,6 +160,11 @@ Future<void> main(List<String> arguments) async {
       'upgrade',
       ArgParser()
         ..addFlag('force', abbr: 'f', negatable: false, help: 'Force upgrade even if already latest')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'feedback',
+      ArgParser()
         ..addFlag('help', abbr: 'h', negatable: false),
     );
 
@@ -868,6 +874,28 @@ Future<void> main(List<String> arguments) async {
       final versionMgr = VersionManager(logger: logger);
       await versionMgr.upgrade(force: upgradeCommand['force'] == true);
       break;
+    case 'feedback':
+      final feedbackCommand = argResults.command!;
+      if (feedbackCommand['help'] == true) {
+        print('Usage: flutter_shadcn feedback');
+        print('');
+        print('Submit feedback or report issues via GitHub.');
+        print('');
+        print('Opens an interactive menu to help you:');
+        print('  🐛 Report bugs');
+        print('  ✨ Request features');
+        print('  📖 Suggest documentation improvements');
+        print('  ❓ Ask questions');
+        print('  ⚡ Report performance issues');
+        print('  💡 Share general feedback');
+        print('');
+        print('Options:');
+        print('  --help, -h   Show this message');
+        exit(0);
+      }
+      final feedbackMgr = FeedbackManager(logger: logger);
+      await feedbackMgr.showFeedbackMenu();
+      break;
   }
 }
 
@@ -888,6 +916,7 @@ void _printUsage() {
   print('  install-skill  Install AI skills (🧪 experimental)');
   print('  version        Show CLI version');
   print('  upgrade        Upgrade CLI to latest version');
+  print('  feedback       Submit feedback or report issues');
   print('  doctor         Diagnose registry resolution');
   print('');
   print('Global flags:');
