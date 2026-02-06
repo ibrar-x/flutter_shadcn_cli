@@ -14,6 +14,10 @@ flutter_shadcn remove <component> [options]
 - `--all`: remove all components
 - `--force`: remove even if dependents exist
 
+## Alias
+
+- `rm`
+
 ## Behavior Details
 
 - Prevents removing components required by others unless `--force`

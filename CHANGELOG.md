@@ -4,6 +4,17 @@
 
 - (empty)
 
+## 0.1.9
+
+### 🧾 Output & Automation
+- **NEW**: Pretty-printed `--json` output for list, search, info, doctor, and dry-run.
+
+### 🧭 CLI Ergonomics
+- **NEW**: Command aliases `ls` → `list`, `rm` → `remove`, `i` → `info`.
+
+### 📚 Documentation
+- **IMPROVED**: Updated README and site docs to cover JSON output and aliases.
+
 ## 0.1.8
 
 ### 🧭 Registry & Schema

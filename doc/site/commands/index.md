@@ -2,6 +2,8 @@
 
 Each command is documented with purpose, syntax, options, behavior flow, files used, and examples.
 
+Aliases: `ls` → `list`, `rm` → `remove`, `i` → `info`.
+
 - [init](init.md)
 - [add](add.md)
 - [remove](remove.md)

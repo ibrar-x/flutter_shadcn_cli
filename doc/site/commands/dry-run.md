@@ -6,12 +6,14 @@ Preview installation steps without writing files.
 ## Syntax
 
 ```bash
-flutter_shadcn dry-run <component> [options]
+flutter_shadcn dry-run <component> [--json]
+flutter_shadcn dry-run --all [--json]
 ```
 
 ## Options
 
-- `--all`: preview all components
+- `--all`: Preview all components.
+- `--json`: Output machine-readable JSON (pretty-printed).
 
 ## Behavior Details
 
@@ -23,4 +25,10 @@ flutter_shadcn dry-run <component> [options]
 ```bash
 flutter_shadcn dry-run button
 flutter_shadcn dry-run --all
+```
+
+JSON output:
+
+```bash
+flutter_shadcn dry-run button --json
 ```

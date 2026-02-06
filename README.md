@@ -22,6 +22,8 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - Tracks installed Widgets in a local components.json.
 - Full cleanup on remove --all (components, composites, shared, config, empty folders).
 - **Component discovery**: list, search, and info commands with intelligent caching.
+- **JSON output**: Pretty-printed `--json` output for list, search, info, doctor, and dry-run (automation friendly).
+- **Command aliases**: `ls` → `list`, `rm` → `remove`, `i` → `info`.
 - **Dry-run preview**: See dependencies, assets, and platform changes before install.
 - **AI skill manager**: Interactive multi-skill installation with auto-discovery of 28+ AI model folders (.claude, .cursor, .gemini, etc.).
   - Human-readable model names (\"Cursor\", \"Claude (Anthropic)\", \"Codex (OpenAI)\")
@@ -139,6 +141,14 @@ Remove everything:
 
 ```bash
 flutter_shadcn remove --all
+```
+
+Aliases:
+
+```bash
+flutter_shadcn rm button
+flutter_shadcn ls
+flutter_shadcn i button
 ```
 
 ## One‑line setup (fast)

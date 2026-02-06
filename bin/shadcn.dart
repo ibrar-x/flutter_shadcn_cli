@@ -75,6 +75,8 @@ Future<void> main(List<String> arguments) async {
       'dry-run',
       ArgParser()
         ..addFlag('all', abbr: 'a', negatable: false)
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -90,7 +92,10 @@ Future<void> main(List<String> arguments) async {
     )
     ..addCommand(
       'doctor',
-      ArgParser()..addFlag('help', abbr: 'h', negatable: false),
+      ArgParser()
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
+        ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
       'assets',
@@ -124,18 +129,24 @@ Future<void> main(List<String> arguments) async {
       'list',
       ArgParser()
         ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
       'search',
       ArgParser()
         ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
       'info',
       ArgParser()
         ..addFlag('refresh', negatable: false, help: 'Refresh cache')
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -189,9 +200,10 @@ Future<void> main(List<String> arguments) async {
         ..addOption('body', help: 'Issue description/body'),
     );
 
+  final normalizedArgs = _normalizeArgs(arguments);
   ArgResults argResults;
   try {
-    argResults = parser.parse(arguments);
+    argResults = parser.parse(normalizedArgs);
   } catch (e) {
     print('Error: $e');
     exit(1);
@@ -492,13 +504,15 @@ Future<void> main(List<String> arguments) async {
         exit(1);
       }
       if (dryRunCommand['help'] == true) {
-        print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
-        print('       flutter_shadcn dry-run --all');
+        print(
+            'Usage: flutter_shadcn dry-run <component> [<component> ...] [--json]');
+        print('       flutter_shadcn dry-run --all [--json]');
         print('');
         print(
             'Shows what would be installed (dependencies, shared modules, assets, fonts).');
         print('Options:');
         print('  --all, -a          Include every available component');
+        print('  --json             Output machine-readable JSON');
         print('  --help, -h         Show this message');
         exit(0);
       }
@@ -519,7 +533,15 @@ Future<void> main(List<String> arguments) async {
         componentIds.addAll(rest);
       }
       final plan = await activeInstaller.buildDryRunPlan(componentIds);
-      activeInstaller.printDryRunPlan(plan);
+      if (dryRunCommand['json'] == true) {
+        final payload = <String, dynamic>{
+          'command': 'dry-run',
+          ...plan.toJson(),
+        };
+        print(const JsonEncoder.withIndent('  ').convert(payload));
+      } else {
+        activeInstaller.printDryRunPlan(plan);
+      }
       break;
     case 'remove':
       final removeCommand = argResults.command!;
@@ -559,6 +581,9 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn doctor');
         print('');
         print('Diagnostics for registry resolution and environment.');
+        print('');
+        print('Options:');
+        print('  --json             Output machine-readable JSON');
         exit(0);
       }
       break;
@@ -659,11 +684,12 @@ Future<void> main(List<String> arguments) async {
     case 'list':
       final listCommand = argResults.command!;
       if (listCommand['help'] == true) {
-        print('Usage: flutter_shadcn list [--refresh]');
+        print('Usage: flutter_shadcn list [--refresh] [--json]');
         print('');
         print('Lists all available components from the registry.');
         print('Options:');
         print('  --refresh  Refresh cache from remote');
+        print('  --json     Output machine-readable JSON');
         exit(0);
       }
       final selection = _resolveRegistrySelection(argResults, roots, config);
@@ -672,17 +698,19 @@ Future<void> main(List<String> arguments) async {
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: listCommand['refresh'] == true,
+        jsonOutput: listCommand['json'] == true,
         logger: logger,
       );
       break;
     case 'search':
       final searchCommand = argResults.command!;
       if (searchCommand['help'] == true) {
-        print('Usage: flutter_shadcn search <query> [--refresh]');
+        print('Usage: flutter_shadcn search <query> [--refresh] [--json]');
         print('');
         print('Searches for components by name, description, or tags.');
         print('Options:');
         print('  --refresh  Refresh cache from remote');
+        print('  --json     Output machine-readable JSON');
         exit(0);
       }
       final searchQuery = searchCommand.rest.join(' ');
@@ -697,17 +725,19 @@ Future<void> main(List<String> arguments) async {
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: searchCommand['refresh'] == true,
+        jsonOutput: searchCommand['json'] == true,
         logger: logger,
       );
       break;
     case 'info':
       final infoCommand = argResults.command!;
       if (infoCommand['help'] == true) {
-        print('Usage: flutter_shadcn info <component-id> [--refresh]');
+        print('Usage: flutter_shadcn info <component-id> [--refresh] [--json]');
         print('');
         print('Shows detailed information about a component.');
         print('Options:');
         print('  --refresh  Refresh cache from remote');
+        print('  --json     Output machine-readable JSON');
         exit(0);
       }
       final componentId =
@@ -723,6 +753,7 @@ Future<void> main(List<String> arguments) async {
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: infoCommand['refresh'] == true,
+        jsonOutput: infoCommand['json'] == true,
         logger: logger,
       );
       break;
@@ -964,6 +995,22 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
+List<String> _normalizeArgs(List<String> args) {
+  if (args.isEmpty) {
+    return args;
+  }
+  final aliasMap = <String, String>{
+    'ls': 'list',
+    'rm': 'remove',
+    'i': 'info',
+  };
+  final mapped = aliasMap[args.first];
+  if (mapped == null) {
+    return args;
+  }
+  return [mapped, ...args.skip(1)];
+}
+
 void _printUsage() {
   print('Usage: flutter_shadcn <command> [arguments]');
   print('Commands:');
@@ -971,13 +1018,13 @@ void _printUsage() {
   print('  theme          Manage registry theme presets');
   print('  add            Add a widget');
   print('  dry-run        Preview what would be installed');
-  print('  remove         Remove a widget');
+  print('  remove         Remove a widget (alias: rm)');
   print('  sync           Sync changes from .shadcn/config.json');
   print('  assets         Install font/icon assets');
   print('  platform       Configure platform targets');
-  print('  list           List available components');
+  print('  list           List available components (alias: ls)');
   print('  search         Search for components');
-  print('  info           Show component details');
+  print('  info           Show component details (alias: i)');
   print('  install-skill  Install AI skills (🧪 experimental)');
   print('  version        Show CLI version');
   print('  upgrade        Upgrade CLI to latest version');
@@ -1174,6 +1221,7 @@ Future<void> _runDoctor(
   ArgResults args,
   ShadcnConfig config,
 ) async {
+  final jsonOutput = args.command?['json'] == true;
   final logger = CliLogger(verbose: args['verbose'] == true);
   final selection = _resolveRegistrySelection(args, roots, config);
   final envRoot = Platform.environment['SHADCN_REGISTRY_ROOT'];
@@ -1184,6 +1232,8 @@ Future<void> _runDoctor(
   final componentsSource = selection.registryRoot.describe('components.json');
   Map<String, dynamic>? registryData;
   SchemaSource? schemaSource;
+  bool? schemaValid;
+  final schemaErrors = <String>[];
   try {
     final content = await selection.registryRoot.readString('components.json');
     final decoded = jsonDecode(content);
@@ -1197,6 +1247,58 @@ Future<void> _runDoctor(
   } catch (_) {
     registryData = null;
     schemaSource = null;
+  }
+
+  if (schemaSource != null && registryData != null) {
+    try {
+      final result = await ComponentsSchemaValidator.validateWithJsonSchema(
+        registryData,
+        schemaSource,
+      );
+      schemaValid = result.isValid;
+      schemaErrors.addAll(result.errors);
+    } catch (e) {
+      schemaValid = false;
+      schemaErrors.add('Failed to validate schema: $e');
+    }
+  }
+
+  final platformTargets = _mergePlatformTargets(config.platformTargets);
+
+  if (jsonOutput) {
+    final payload = <String, dynamic>{
+      'command': 'doctor',
+      'environment': {
+        'script': Platform.script.toFilePath(),
+        'cwd': Directory.current.path,
+        'pubCache': pubCache,
+      },
+      'registry': {
+        'mode': selection.mode,
+        'root': selection.registryRoot.root,
+        'componentsJson': componentsSource,
+        'cache': cachePath ?? '(local registry, no cache)',
+        'schema': schemaSource?.label,
+      },
+      'configuration': {
+        'SHADCN_REGISTRY_ROOT': envRoot,
+        'SHADCN_REGISTRY_URL': envUrl,
+        'cliRoot': roots.cliRoot,
+        'localRegistryRoot': roots.localRegistryRoot,
+        'config.registryMode': config.registryMode,
+        'config.registryPath': config.registryPath,
+        'config.registryUrl': config.registryUrl,
+      },
+      'schema': {
+        'found': schemaSource != null,
+        'valid': schemaValid,
+        'errorCount': schemaErrors.length,
+        'errors': schemaErrors,
+      },
+      'platformTargets': platformTargets,
+    };
+    print(const JsonEncoder.withIndent('  ').convert(payload));
+    return;
   }
 
   logger.header('flutter_shadcn doctor');
@@ -1236,28 +1338,19 @@ Future<void> _runDoctor(
   if (schemaSource == null || registryData == null) {
     logger.warn('  Schema file not found.');
   } else {
-    try {
-      final result = await ComponentsSchemaValidator.validateWithJsonSchema(
-        registryData,
-        schemaSource,
-      );
-      if (result.isValid) {
-        logger.success('  components.json matches the schema.');
-      } else {
-        logger.error('  Schema issues: ${result.errors.length}');
-        for (final error in result.errors.take(12)) {
-          logger.info('  - $error');
-        }
-        if (result.errors.length > 12) {
-          logger.info('  ...and ${result.errors.length - 12} more');
-        }
+    if (schemaValid == true) {
+      logger.success('  components.json matches the schema.');
+    } else {
+      logger.error('  Schema issues: ${schemaErrors.length}');
+      for (final error in schemaErrors.take(12)) {
+        logger.info('  - $error');
       }
-    } catch (e) {
-      logger.error('  Failed to validate schema: $e');
+      if (schemaErrors.length > 12) {
+        logger.info('  ...and ${schemaErrors.length - 12} more');
+      }
     }
   }
 
-  final platformTargets = _mergePlatformTargets(config.platformTargets);
   print('');
   logger.section('Platform targets');
   logger

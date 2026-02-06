@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_shadcn_cli/src/index_loader.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 
@@ -8,9 +9,12 @@ Future<void> handleListCommand({
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool jsonOutput,
   required CliLogger logger,
 }) async {
-  logger.section('📦 Available Components');
+  if (!jsonOutput) {
+    logger.section('📦 Available Components');
+  }
 
   try {
     final loader = IndexLoader(
@@ -24,6 +28,20 @@ Future<void> handleListCommand({
         ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
         .toList() ??
         [];
+
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'list',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'count': components.length,
+        'components': components.map((c) => c.toJson()).toList(),
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
 
     if (components.isEmpty) {
       logger.info('No components found.');
@@ -70,8 +88,22 @@ Future<void> handleListCommand({
     print('═' * 60);
     logger.info('${components.length} components total.');
   } catch (e) {
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'list',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'ok': false,
+        'error': e.toString(),
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
     logger.error('Failed to load components: $e');
-    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    logger.info(
+        'Tip: Check your registry URL or run with --registry-url for a custom location.');
     return;
   }
 }
@@ -84,14 +116,30 @@ Future<void> handleSearchCommand({
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool jsonOutput,
   required CliLogger logger,
 }) async {
   if (query.isEmpty) {
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'search',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'ok': false,
+        'error': 'Search query is required.',
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
     logger.error('Please provide a search query.');
     return;
   }
 
-  logger.section('🔍 Search Results: "$query"');
+  if (!jsonOutput) {
+    logger.section('🔍 Search Results: "$query"');
+  }
 
   try {
     final loader = IndexLoader(
@@ -108,6 +156,27 @@ Future<void> handleSearchCommand({
 
     // Filter by query
     components = components.where((c) => c.matches(query)).toList();
+
+    if (jsonOutput) {
+      final results = components
+          .map((c) => {
+                ...c.toJson(),
+                'score': c.relevanceScore(query),
+              })
+          .toList();
+      final payload = <String, dynamic>{
+        'command': 'search',
+        'query': query,
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'count': results.length,
+        'results': results,
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
 
     if (components.isEmpty) {
       logger.info('No matches found for "$query".');
@@ -144,8 +213,23 @@ Future<void> handleSearchCommand({
     print('═' * 60);
     logger.info('Found ${components.length} matching components.');
   } catch (e) {
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'search',
+        'query': query,
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'ok': false,
+        'error': e.toString(),
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
     logger.error('Failed to search components: $e');
-    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    logger.info(
+        'Tip: Check your registry URL or run with --registry-url for a custom location.');
     return;
   }
 }
@@ -158,9 +242,23 @@ Future<void> handleInfoCommand({
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool jsonOutput,
   required CliLogger logger,
 }) async {
   if (componentId.isEmpty) {
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'info',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'ok': false,
+        'error': 'Component id is required.',
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
     logger.error('Please provide a component id.');
     return;
   }
@@ -182,6 +280,19 @@ Future<void> handleInfoCommand({
       (c) => c.id == componentId,
       orElse: () => throw Exception('Component "$componentId" not found'),
     );
+
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'info',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'component': comp.toJson(),
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
 
     logger.section('📋 Component: ${comp.name}');
     print('');
@@ -269,8 +380,22 @@ Future<void> handleInfoCommand({
       print('');
     }
   } catch (e) {
+    if (jsonOutput) {
+      final payload = <String, dynamic>{
+        'command': 'info',
+        'registry': {
+          'id': registryId,
+          'baseUrl': registryBaseUrl,
+        },
+        'ok': false,
+        'error': e.toString(),
+      };
+      print(const JsonEncoder.withIndent('  ').convert(payload));
+      return;
+    }
     logger.error('Failed to load component info: $e');
-    logger.info('Tip: Check your registry URL or run with --registry-url for a custom location.');
+    logger.info(
+        'Tip: Check your registry URL or run with --registry-url for a custom location.');
     return;
   }
 }

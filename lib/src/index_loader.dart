@@ -215,6 +215,23 @@ class IndexComponent {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'category': category,
+      'description': description,
+      'tags': tags,
+      'install': install,
+      'import': import_,
+      'importPath': importPath,
+      'api': api,
+      'examples': examples,
+      'dependencies': dependencies,
+      'related': related,
+    };
+  }
+
   /// Checks if component matches any of the search terms.
   bool matches(String query) {
     final lower = query.toLowerCase();

@@ -2598,6 +2598,35 @@ class DryRunPlan {
     required this.fileDependencies,
     required this.platformChanges,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'requested': requested,
+      'missing': missing,
+      'components': components.map((c) => c.id).toList(),
+      'dependencyGraph': dependencyGraph,
+      'shared': shared,
+      'pubspecDependencies': pubspecDependencies,
+      'assets': assets,
+      'fonts': fonts
+          .map((font) => {
+                'family': font.family,
+                'fonts': font.fonts
+                    .map((entry) => {
+                          'asset': entry.asset,
+                          'weight': entry.weight,
+                          'style': entry.style,
+                        })
+                    .toList(),
+              })
+          .toList(),
+      'postInstall': postInstall,
+      'fileDependencies': fileDependencies,
+      'platformChanges': platformChanges.map(
+        (key, value) => MapEntry(key, value.toList()..sort()),
+      ),
+    };
+  }
 }
 
 final _classRegex = RegExp(
