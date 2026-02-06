@@ -19,17 +19,19 @@ Future<void> main(List<String> arguments) async {
     ..addFlag('verbose', abbr: 'v', negatable: false)
     ..addFlag('help', abbr: 'h', negatable: false)
     ..addFlag('wip', negatable: false, help: 'Enable WIP features')
-    ..addFlag('experimental', negatable: false, help: 'Enable experimental features')
-    ..addFlag('dev', negatable: false, help: 'Persist local registry for dev mode')
+    ..addFlag('experimental',
+        negatable: false, help: 'Enable experimental features')
+    ..addFlag('dev',
+        negatable: false, help: 'Persist local registry for dev mode')
     ..addOption('dev-path', help: 'Local registry path to persist for dev mode')
-    ..addOption('registry', allowed: ['auto', 'local', 'remote'], defaultsTo: 'auto')
+    ..addOption('registry',
+        allowed: ['auto', 'local', 'remote'], defaultsTo: 'auto')
     ..addOption('registry-path', help: 'Path to local registry folder')
     ..addOption('registry-url', help: 'Remote registry base URL (repo root)')
     ..addCommand(
       'init',
       ArgParser()
         ..addFlag('all', abbr: 'a', negatable: false)
-        ..addMultiOption('add', abbr: 'c')
         ..addFlag('yes', abbr: 'y', negatable: false)
         ..addFlag(
           'install-fonts',
@@ -142,12 +144,22 @@ Future<void> main(List<String> arguments) async {
         ..addOption('skill', abbr: 's', help: 'Skill id to install')
         ..addOption('model', abbr: 'm', help: 'Model name (e.g., gpt-4)')
         ..addOption('skills-url', help: 'Override skills base URL/path')
-        ..addFlag('symlink', negatable: false, help: 'Symlink shared skill to model')
+        ..addFlag('symlink',
+            negatable: false, help: 'Symlink shared skill to model')
         ..addFlag('list', negatable: false, help: 'List installed skills')
-        ..addFlag('available', abbr: 'a', negatable: false, help: 'List available skills from registry')
-        ..addFlag('interactive', abbr: 'i', negatable: false, help: 'Interactive multi-skill installation')
-        ..addOption('uninstall', help: 'Uninstall skill (specify --model for single removal)')
-        ..addFlag('uninstall-interactive', negatable: false, help: 'Interactive removal (choose skills and models)')
+        ..addFlag('available',
+            abbr: 'a',
+            negatable: false,
+            help: 'List available skills from registry')
+        ..addFlag('interactive',
+            abbr: 'i',
+            negatable: false,
+            help: 'Interactive multi-skill installation')
+        ..addOption('uninstall',
+            help: 'Uninstall skill (specify --model for single removal)')
+        ..addFlag('uninstall-interactive',
+            negatable: false,
+            help: 'Interactive removal (choose skills and models)')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -159,14 +171,20 @@ Future<void> main(List<String> arguments) async {
     ..addCommand(
       'upgrade',
       ArgParser()
-        ..addFlag('force', abbr: 'f', negatable: false, help: 'Force upgrade even if already latest')
+        ..addFlag('force',
+            abbr: 'f',
+            negatable: false,
+            help: 'Force upgrade even if already latest')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
       'feedback',
       ArgParser()
         ..addFlag('help', abbr: 'h', negatable: false)
-        ..addOption('type', abbr: 't', help: 'Feedback type: bug, feature, docs, question, performance, other')
+        ..addOption('type',
+            abbr: 't',
+            help:
+                'Feedback type: bug, feature, docs, question, performance, other')
         ..addOption('title', help: 'Issue title')
         ..addOption('body', help: 'Issue description/body'),
     );
@@ -199,7 +217,9 @@ Future<void> main(List<String> arguments) async {
   // Skip for version and upgrade commands to avoid recursion
   final shouldCheckUpdates = config.checkUpdates ?? true;
   final commandName = argResults.command?.name;
-  if (shouldCheckUpdates && commandName != 'version' && commandName != 'upgrade') {
+  if (shouldCheckUpdates &&
+      commandName != 'version' &&
+      commandName != 'upgrade') {
     final versionMgr = VersionManager(logger: logger);
     // Run in background without blocking
     unawaited(versionMgr.autoCheckForUpdates());
@@ -248,7 +268,7 @@ Future<void> main(List<String> arguments) async {
   Registry? registry;
   if (needsRegistry.contains(argResults.command!.name)) {
     final selection = _resolveRegistrySelection(argResults, roots, config);
-    final schemaPath = _resolveComponentsSchemaPath(roots, selection);
+    final schemaPath = null;
     final cachePath = _componentsJsonCachePath(selection.registryRoot);
     try {
       registry = await Registry.load(
@@ -285,7 +305,6 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn init [options]');
         print('');
         print('Options:');
-        print('  --add, -c <name>   Add components after init (repeatable)');
         print('  --all, -a          Add every component after init');
         print('  --yes, -y          Skip prompts and use defaults');
         print('  --install-fonts    Install typography fonts during init');
@@ -326,9 +345,8 @@ Future<void> main(List<String> arguments) async {
       final classPrefix = initCommand.wasParsed('prefix')
           ? initCommand['prefix'] as String?
           : null;
-      final aliasOverrides = initCommand.wasParsed('alias') && aliases.isNotEmpty
-          ? aliases
-          : null;
+      final aliasOverrides =
+          initCommand.wasParsed('alias') && aliases.isNotEmpty ? aliases : null;
 
       await activeInstaller.init(
         skipPrompts: skipPrompts,
@@ -357,7 +375,6 @@ Future<void> main(List<String> arguments) async {
 
       final addAll = initCommand['all'] == true;
       final addList = <String>[
-        ...(initCommand['add'] as List).cast<String>(),
         ...initCommand.rest,
       ];
       if (addAll) {
@@ -407,7 +424,8 @@ Future<void> main(List<String> arguments) async {
       final applyUrl = themeCommand['apply-url'] as String?;
       if (applyFile != null || applyUrl != null) {
         if (!isExperimental) {
-          stderr.writeln('Error: --apply-file/--apply-url require --experimental.');
+          stderr.writeln(
+              'Error: --apply-file/--apply-url require --experimental.');
           exit(1);
         }
         if (applyFile != null) {
@@ -477,7 +495,8 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
         print('       flutter_shadcn dry-run --all');
         print('');
-        print('Shows what would be installed (dependencies, shared modules, assets, fonts).');
+        print(
+            'Shows what would be installed (dependencies, shared modules, assets, fonts).');
         print('Options:');
         print('  --all, -a          Include every available component');
         print('  --help, -h         Show this message');
@@ -489,7 +508,8 @@ Future<void> main(List<String> arguments) async {
       if (dryRunAll) {
         componentIds.add('icon_fonts');
         componentIds.add('typography_fonts');
-        componentIds.addAll(activeInstaller.registry.components.map((c) => c.id));
+        componentIds
+            .addAll(activeInstaller.registry.components.map((c) => c.id));
       } else {
         if (rest.isEmpty) {
           print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
@@ -553,8 +573,10 @@ Future<void> main(List<String> arguments) async {
         print('Usage: flutter_shadcn assets [options]');
         print('');
         print('Options:');
-        print('  --icons          Install icon font assets (Lucide/Radix/Bootstrap)');
-        print('  --typography     Install typography fonts (GeistSans/GeistMono)');
+        print(
+            '  --icons          Install icon font assets (Lucide/Radix/Bootstrap)');
+        print(
+            '  --typography     Install typography fonts (GeistSans/GeistMono)');
         print('  --fonts          Alias for --typography');
         print('  --list           List available assets');
         print('  --all, -a        Install both icon + typography fonts');
@@ -590,12 +612,15 @@ Future<void> main(List<String> arguments) async {
     case 'platform':
       final platformCommand = argResults.command!;
       if (platformCommand['help'] == true) {
-        print('Usage: flutter_shadcn platform [--list | --set <p.s=path> | --reset <p.s>]');
+        print(
+            'Usage: flutter_shadcn platform [--list | --set <p.s=path> | --reset <p.s>]');
         print('');
         print('Options:');
         print('  --list             List platform targets');
-        print('  --set              Set override (repeatable), e.g. ios.infoPlist=ios/Runner/Info.plist');
-        print('  --reset            Remove override (repeatable), e.g. ios.infoPlist');
+        print(
+            '  --set              Set override (repeatable), e.g. ios.infoPlist=ios/Runner/Info.plist');
+        print(
+            '  --reset            Remove override (repeatable), e.g. ios.infoPlist');
         print('  --help, -h         Show this message');
         exit(0);
       }
@@ -625,7 +650,8 @@ Future<void> main(List<String> arguments) async {
       if (syncCommand['help'] == true) {
         print('Usage: flutter_shadcn sync');
         print('');
-        print('Re-applies .shadcn/config.json (paths, theme) to existing files.');
+        print(
+            'Re-applies .shadcn/config.json (paths, theme) to existing files.');
         exit(0);
       }
       await activeInstaller.syncFromConfig();
@@ -684,7 +710,8 @@ Future<void> main(List<String> arguments) async {
         print('  --refresh  Refresh cache from remote');
         exit(0);
       }
-      final componentId = infoCommand.rest.isNotEmpty ? infoCommand.rest.first : '';
+      final componentId =
+          infoCommand.rest.isNotEmpty ? infoCommand.rest.first : '';
       if (componentId.isEmpty) {
         print('Usage: flutter_shadcn info <component-id>');
         exit(1);
@@ -702,28 +729,41 @@ Future<void> main(List<String> arguments) async {
     case 'install-skill':
       final skillCommand = argResults.command!;
       if (skillCommand['help'] == true) {
-        print('Usage: flutter_shadcn install-skill [--skill <id>] [--model <name>] [options]');
+        print(
+            'Usage: flutter_shadcn install-skill [--skill <id>] [--model <name>] [options]');
         print('');
-        print('\x1B[33m⚠️  EXPERIMENTAL - This command has not been fully tested yet. Use with caution.\x1B[0m');
+        print(
+            '\x1B[33m⚠️  EXPERIMENTAL - This command has not been fully tested yet. Use with caution.\x1B[0m');
         print('');
         print('Manages AI skills for model-specific installations.');
-        print('Discovers hidden AI model folders (.claude, .gpt4, .cursor, etc.) in project root.');
+        print(
+            'Discovers hidden AI model folders (.claude, .gpt4, .cursor, etc.) in project root.');
         print('');
         print('Modes:');
-        print('  (no args)              Multi-skill interactive mode (default)');
-        print('  --available, -a        List all available skills from skills.json registry');
-        print('  --list                 List all installed skills grouped by model');
-        print('  --skill <id>           Install single skill (opens interactive model menu if no --model)');
-        print('  --skill <id> --model   Install skill to specific model folder');
-        print('  --skills-url           Override skills base URL/path (defaults to registry URL)');
-        print('  --symlink --model      Create symlinks from source model to other models');
-        print('  --uninstall <id>       Remove skill from specific model (requires --model)');
-        print('  --uninstall-interactive Remove skills (interactive: choose skills and models)');
+        print(
+            '  (no args)              Multi-skill interactive mode (default)');
+        print(
+            '  --available, -a        List all available skills from skills.json registry');
+        print(
+            '  --list                 List all installed skills grouped by model');
+        print(
+            '  --skill <id>           Install single skill (opens interactive model menu if no --model)');
+        print(
+            '  --skill <id> --model   Install skill to specific model folder');
+        print(
+            '  --skills-url           Override skills base URL/path (defaults to registry URL)');
+        print(
+            '  --symlink --model      Create symlinks from source model to other models');
+        print(
+            '  --uninstall <id>       Remove skill from specific model (requires --model)');
+        print(
+            '  --uninstall-interactive Remove skills (interactive: choose skills and models)');
         print('');
         print('Default Interactive Installation Flow:');
         print('  1. Shows all available skills from skills.json');
         print('  2. Select which skills to install (comma-separated or "all")');
-        print('  3. Discovers all .{model}/ folders (shown with readable names)');
+        print(
+            '  3. Discovers all .{model}/ folders (shown with readable names)');
         print('  4. Select target models (numbered menu or "all")');
         print('  5. Choose mode for multiple selections:');
         print('     - Copy skill to each model folder');
@@ -737,12 +777,18 @@ Future<void> main(List<String> arguments) async {
         print('  4. Confirm removal before proceeding');
         print('');
         print('Examples:');
-        print('  flutter_shadcn install-skill                    # Default: multi-skill interactive');
-        print('  flutter_shadcn install-skill --available        # List available skills from registry');
-        print('  flutter_shadcn install-skill --skill my-skill   # Install single skill, pick models');
-        print('  flutter_shadcn install-skill --list             # Show installed skills by model');
-        print('  flutter_shadcn install-skill --uninstall-interactive  # Remove skills (interactive menu)');
-        print('  flutter_shadcn install-skill --uninstall flutter-shadcn-ui --model .claude  # Remove from one model');
+        print(
+            '  flutter_shadcn install-skill                    # Default: multi-skill interactive');
+        print(
+            '  flutter_shadcn install-skill --available        # List available skills from registry');
+        print(
+            '  flutter_shadcn install-skill --skill my-skill   # Install single skill, pick models');
+        print(
+            '  flutter_shadcn install-skill --list             # Show installed skills by model');
+        print(
+            '  flutter_shadcn install-skill --uninstall-interactive  # Remove skills (interactive menu)');
+        print(
+            '  flutter_shadcn install-skill --uninstall flutter-shadcn-ui --model .claude  # Remove from one model');
         exit(0);
       }
 
@@ -774,7 +820,8 @@ Future<void> main(List<String> arguments) async {
             ? skillCommand['model'] as String?
             : null;
         if (model == null) {
-          logger.error('--uninstall requires --model, or use --uninstall-interactive for menu');
+          logger.error(
+              '--uninstall requires --model, or use --uninstall-interactive for menu');
           exit(1);
         }
         await skillMgr.uninstallSkill(skillId: skillId, model: model);
@@ -791,8 +838,7 @@ Future<void> main(List<String> arguments) async {
         }
         // Ask for destination models
         final allModels = skillMgr.discoverModelFolders();
-        final available =
-            allModels.where((m) => m != targetModel).toList();
+        final available = allModels.where((m) => m != targetModel).toList();
         if (available.isEmpty) {
           logger.error('No other models available to symlink to.');
           exit(1);
@@ -867,7 +913,8 @@ Future<void> main(List<String> arguments) async {
       if (upgradeCommand['help'] == true) {
         print('Usage: flutter_shadcn upgrade [--force]');
         print('');
-        print('Upgrades flutter_shadcn_cli to the latest version from pub.dev.');
+        print(
+            'Upgrades flutter_shadcn_cli to the latest version from pub.dev.');
         print('');
         print('Options:');
         print('  --force, -f  Force upgrade even if already on latest version');
@@ -888,7 +935,8 @@ Future<void> main(List<String> arguments) async {
         print('  flutter_shadcn feedback');
         print('');
         print('Non-interactive mode:');
-        print('  flutter_shadcn feedback --type bug --title "Title" --body "Description"');
+        print(
+            '  flutter_shadcn feedback --type bug --title "Title" --body "Description"');
         print('');
         print('Feedback types:');
         print('  🐛 bug          Report bugs');
@@ -899,7 +947,8 @@ Future<void> main(List<String> arguments) async {
         print('  💡 other        Share general feedback');
         print('');
         print('Options:');
-        print('  --type, -t    Feedback type (bug, feature, docs, question, performance, other)');
+        print(
+            '  --type, -t    Feedback type (bug, feature, docs, question, performance, other)');
         print('  --title       Issue title');
         print('  --body        Issue description/body');
         print('  --help, -h    Show this message');
@@ -1037,7 +1086,8 @@ String? _findKitRegistryFromCliRoot(String? cliRoot) {
   }
   final parent = p.dirname(cliRoot);
   final candidates = [
-    p.join(parent, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib', 'registry'),
+    p.join(
+        parent, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib', 'registry'),
     p.join(parent, 'flutter_shadcn_kit', 'lib', 'registry'),
     p.join(parent, 'shadcn_flutter_kit', 'lib', 'registry'),
   ];
@@ -1054,7 +1104,8 @@ String? _findKitRegistryUpwards(Directory start) {
   var current = start.absolute;
   for (var i = 0; i < 8; i++) {
     final candidates = [
-      p.join(current.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib', 'registry'),
+      p.join(current.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'lib',
+          'registry'),
       p.join(current.path, 'flutter_shadcn_kit', 'lib', 'registry'),
       p.join(current.path, 'shadcn_flutter_kit', 'lib', 'registry'),
     ];
@@ -1129,9 +1180,24 @@ Future<void> _runDoctor(
   final envUrl = Platform.environment['SHADCN_REGISTRY_URL'];
   final pubCache = Platform.environment['PUB_CACHE'] ??
       p.join(Platform.environment['HOME'] ?? '', '.pub-cache');
-  final schemaPath = _resolveComponentsSchemaPath(roots, selection);
   final cachePath = _componentsJsonCachePath(selection.registryRoot);
   final componentsSource = selection.registryRoot.describe('components.json');
+  Map<String, dynamic>? registryData;
+  SchemaSource? schemaSource;
+  try {
+    final content = await selection.registryRoot.readString('components.json');
+    final decoded = jsonDecode(content);
+    if (decoded is Map<String, dynamic>) {
+      registryData = decoded;
+      schemaSource = ComponentsSchemaValidator.resolveSchemaSource(
+        data: decoded,
+        registryRoot: selection.registryRoot,
+      );
+    }
+  } catch (_) {
+    registryData = null;
+    schemaSource = null;
+  }
 
   logger.header('flutter_shadcn doctor');
 
@@ -1153,7 +1219,7 @@ Future<void> _runDoctor(
   kv('Root', selection.registryRoot.root);
   kv('components.json', componentsSource);
   kv('Cache', cachePath ?? '(local registry, no cache)');
-  kv('Schema', schemaPath ?? '(not found)');
+  kv('Schema', schemaSource?.label ?? '(not found)');
 
   print('');
   logger.section('Configuration');
@@ -1167,13 +1233,14 @@ Future<void> _runDoctor(
 
   print('');
   logger.section('Schema validation');
-  if (schemaPath == null) {
+  if (schemaSource == null || registryData == null) {
     logger.warn('  Schema file not found.');
   } else {
     try {
-      final content = await selection.registryRoot.readString('components.json');
-      final data = jsonDecode(content);
-      final result = ComponentsSchemaValidator.validate(data, schemaPath);
+      final result = await ComponentsSchemaValidator.validateWithJsonSchema(
+        registryData,
+        schemaSource,
+      );
       if (result.isValid) {
         logger.success('  components.json matches the schema.');
       } else {
@@ -1193,7 +1260,8 @@ Future<void> _runDoctor(
   final platformTargets = _mergePlatformTargets(config.platformTargets);
   print('');
   logger.section('Platform targets');
-  logger.info('  (set .shadcn/config.json "platformTargets" to override paths)');
+  logger
+      .info('  (set .shadcn/config.json "platformTargets" to override paths)');
   platformTargets.forEach((platform, targets) {
     logger.info('  $platform:');
     for (final entry in targets.entries) {
@@ -1221,51 +1289,6 @@ String _sanitizeCacheKey(String value) {
     return safe.substring(0, 80);
   }
   return safe;
-}
-
-String? _resolveComponentsSchemaPath(
-  ResolvedRoots roots,
-  RegistrySelection selection,
-) {
-  final candidates = <String?>[
-    p.join(
-      Directory.current.path,
-      'shadcn_flutter_kit',
-      'flutter_shadcn_kit',
-      'lib',
-      'registry',
-      'components.schema.json',
-    ),
-    p.join(
-      Directory.current.path,
-      'flutter_shadcn_kit',
-      'lib',
-      'registry',
-      'components.schema.json',
-    ),
-    roots.localRegistryRoot == null
-        ? null
-        : p.join(roots.localRegistryRoot!, 'components.schema.json'),
-    '/Users/ibrar/Desktop/infinora.noworkspace/shadcn_copy_paste/shadcn_flutter_kit/flutter_shadcn_kit/lib/registry/components.schema.json',
-  ];
-
-  for (final candidate in candidates) {
-    if (candidate == null) {
-      continue;
-    }
-    if (File(candidate).existsSync()) {
-      return candidate;
-    }
-  }
-
-  if (!selection.registryRoot.isRemote) {
-    final localPath = p.join(selection.registryRoot.root, 'components.schema.json');
-    if (File(localPath).existsSync()) {
-      return localPath;
-    }
-  }
-
-  return null;
 }
 
 Map<String, Map<String, String>> _mergePlatformTargets(
@@ -1315,7 +1338,8 @@ ShadcnConfig? _updatePlatformTargets(
       ? <String, Map<String, String>>{}
       : Map<String, Map<String, String>>.fromEntries(
           config.platformTargets!.entries.map(
-            (entry) => MapEntry(entry.key, Map<String, String>.from(entry.value)),
+            (entry) =>
+                MapEntry(entry.key, Map<String, String>.from(entry.value)),
           ),
         );
 
@@ -1387,7 +1411,8 @@ RegistrySelection _resolveRegistrySelection(
   ShadcnConfig config,
 ) {
   final mode = (args?['registry'] as String?) ?? config.registryMode ?? 'auto';
-  final pathOverride = (args?['registry-path'] as String?) ?? config.registryPath;
+  final pathOverride =
+      (args?['registry-path'] as String?) ?? config.registryPath;
   final urlOverride = (args?['registry-url'] as String?) ?? config.registryUrl;
 
   if (mode == 'local' || mode == 'auto') {
@@ -1448,9 +1473,11 @@ String _resolveRemoteBase(String? override) {
 }
 
 _RemoteRoots _resolveRemoteRoots(String base) {
-  final normalized = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+  final normalized =
+      base.endsWith('/') ? base.substring(0, base.length - 1) : base;
   if (normalized.endsWith('/registry')) {
-    final sourceRoot = normalized.substring(0, normalized.length - '/registry'.length);
+    final sourceRoot =
+        normalized.substring(0, normalized.length - '/registry'.length);
     return _RemoteRoots(registryRoot: normalized, sourceRoot: sourceRoot);
   }
   return _RemoteRoots(
@@ -1514,4 +1541,4 @@ String _stripLibPrefix(String value) {
 }
 
 const String _defaultRemoteRegistryBase =
-  'https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib';
+    'https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib';

@@ -17,6 +17,7 @@ dependencies:
   prompts: ^2.0.0 # For user interaction
   yaml: ^3.1.3
   http: ^1.6.0
+  json_schema: ^5.2.2
 
 dev_dependencies:
   lints: ^6.1.0

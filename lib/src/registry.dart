@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:json_schema/json_schema.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:path/path.dart' as p;
 
@@ -33,8 +34,16 @@ class Registry {
       }
     }
 
-    if (schemaPath != null) {
-      final result = ComponentsSchemaValidator.validate(data, schemaPath);
+    final schemaSource = ComponentsSchemaValidator.resolveSchemaSource(
+      data: data is Map<String, dynamic> ? data : const {},
+      registryRoot: registryRoot,
+      schemaPathOverride: schemaPath,
+    );
+    if (schemaSource != null) {
+      final result = await ComponentsSchemaValidator.validateWithJsonSchema(
+        data,
+        schemaSource,
+      );
       if (!result.isValid) {
         logger?.warn(
           'components.json schema validation failed (${result.errors.length} issues).',
@@ -78,6 +87,16 @@ class Registry {
   }
 }
 
+class SchemaSource {
+  final String label;
+  final Future<String> Function() read;
+
+  const SchemaSource({
+    required this.label,
+    required this.read,
+  });
+}
+
 class SchemaValidationResult {
   final bool isValid;
   final List<String> errors;
@@ -89,7 +108,50 @@ class SchemaValidationResult {
 }
 
 class ComponentsSchemaValidator {
-  static SchemaValidationResult validate(
+  static SchemaSource? resolveSchemaSource({
+    required Map<String, dynamic> data,
+    required RegistryLocation registryRoot,
+    String? schemaPathOverride,
+  }) {
+    final override = schemaPathOverride?.trim();
+    if (override != null && override.isNotEmpty) {
+      return _schemaSourceFromString(override, registryRoot);
+    }
+
+    final schemaRef = data[r'$schema'];
+    if (schemaRef is String && schemaRef.trim().isNotEmpty) {
+      final resolved = _schemaSourceFromString(schemaRef.trim(), registryRoot);
+      if (resolved != null) {
+        return resolved;
+      }
+    }
+
+    return SchemaSource(
+      label: registryRoot.describe('components.schema.json'),
+      read: () => registryRoot.readString('components.schema.json'),
+    );
+  }
+
+  static Future<SchemaValidationResult> validateWithJsonSchema(
+    dynamic data,
+    SchemaSource schemaSource,
+  ) async {
+    try {
+      final schemaContent = await schemaSource.read();
+      final schemaData = jsonDecode(schemaContent);
+      final schema = JsonSchema.create(schemaData);
+      final result = schema.validate(data);
+      final errors = result.errors.map((e) => e.toString()).toList();
+      return SchemaValidationResult(isValid: result.isValid, errors: errors);
+    } catch (e) {
+      return SchemaValidationResult(
+        isValid: false,
+        errors: ['Failed to validate schema: $e'],
+      );
+    }
+  }
+
+  static SchemaValidationResult validateLegacy(
     dynamic data,
     String schemaPath,
   ) {
@@ -181,6 +243,53 @@ class ComponentsSchemaValidator {
     }
 
     return SchemaValidationResult(isValid: errors.isEmpty, errors: errors);
+  }
+
+  static SchemaSource? _schemaSourceFromString(
+    String value,
+    RegistryLocation registryRoot,
+  ) {
+    final trimmed = value.trim();
+    if (_isHttpUrl(trimmed)) {
+      return SchemaSource(
+        label: trimmed,
+        read: () async {
+          final response = await http.get(Uri.parse(trimmed));
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw Exception(
+              'Failed to fetch schema ($trimmed) (${response.statusCode})',
+            );
+          }
+          return response.body;
+        },
+      );
+    }
+
+    if (File(trimmed).existsSync()) {
+      return SchemaSource(
+        label: trimmed,
+        read: () => File(trimmed).readAsString(),
+      );
+    }
+
+    final relative = _normalizeSchemaPath(trimmed);
+    return SchemaSource(
+      label: registryRoot.describe(relative),
+      read: () => registryRoot.readString(relative),
+    );
+  }
+
+  static bool _isHttpUrl(String value) {
+    return value.startsWith('http://') || value.startsWith('https://');
+  }
+
+  static String _normalizeSchemaPath(String value) {
+    var normalized = value.replaceAll('\\', '/');
+    if (normalized.startsWith('./')) {
+      normalized = normalized.substring(2);
+    }
+    normalized = normalized.replaceFirst(RegExp(r'^/+'), '');
+    return p.posix.normalize(normalized);
   }
 
   static void _validateComponent(
@@ -281,7 +390,8 @@ class ComponentsSchemaValidator {
                 errors.add('$path.fonts[$i].fonts[$j].asset must be a string');
               }
               if (file['weight'] != null && file['weight'] is! int) {
-                errors.add('$path.fonts[$i].fonts[$j].weight must be an integer');
+                errors
+                    .add('$path.fonts[$i].fonts[$j].weight must be an integer');
               }
               if (file['style'] != null && file['style'] is! String) {
                 errors.add('$path.fonts[$i].fonts[$j].style must be a string');
@@ -303,25 +413,31 @@ class ComponentsSchemaValidator {
             return;
           }
           if (!_isStringList(value['permissions'] ?? const [])) {
-            errors.add('$path.platform.$key.permissions must be an array of strings');
+            errors.add(
+                '$path.platform.$key.permissions must be an array of strings');
           }
           if (!_isStringList(value['entitlements'] ?? const [])) {
-            errors.add('$path.platform.$key.entitlements must be an array of strings');
+            errors.add(
+                '$path.platform.$key.entitlements must be an array of strings');
           }
           if (!_isStringList(value['podfile'] ?? const [])) {
-            errors.add('$path.platform.$key.podfile must be an array of strings');
+            errors
+                .add('$path.platform.$key.podfile must be an array of strings');
           }
           if (!_isStringList(value['gradle'] ?? const [])) {
-            errors.add('$path.platform.$key.gradle must be an array of strings');
+            errors
+                .add('$path.platform.$key.gradle must be an array of strings');
           }
           if (!_isStringList(value['config'] ?? const [])) {
-            errors.add('$path.platform.$key.config must be an array of strings');
+            errors
+                .add('$path.platform.$key.config must be an array of strings');
           }
           if (!_isStringList(value['notes'] ?? const [])) {
             errors.add('$path.platform.$key.notes must be an array of strings');
           }
           if (value['infoPlist'] != null && !_isStringMap(value['infoPlist'])) {
-            errors.add('$path.platform.$key.infoPlist must be an object of strings');
+            errors.add(
+                '$path.platform.$key.infoPlist must be an object of strings');
           }
         });
       }
@@ -443,15 +559,17 @@ class SharedItem {
 
   SharedItem.fromJson(Map<String, dynamic> json)
       : id = json['id'],
-      files = (json['files'] as List)
-        .map((e) => RegistryFile.fromJson(e))
-        .toList();
+        files = (json['files'] as List)
+            .map((e) => RegistryFile.fromJson(e))
+            .toList();
 }
 
 class Component {
   final String id;
   final String name;
   final String? category;
+  final String? version;
+  final List<String> tags;
   final List<RegistryFile> files;
   final List<String> shared;
   final List<String> dependsOn;
@@ -465,6 +583,8 @@ class Component {
       : id = json['id'],
         name = json['name'],
         category = json['category'] as String?,
+        version = json['version'] as String?,
+        tags = List<String>.from(json['tags'] ?? const []),
         files = (json['files'] as List)
             .map((e) => RegistryFile.fromJson(e))
             .toList(),
@@ -474,13 +594,13 @@ class Component {
         fonts = (json['fonts'] as List<dynamic>? ?? const [])
             .map((e) => FontEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
-      pubspec = json['pubspec'] ?? {},
-      postInstall = List<String>.from(json['postInstall'] ?? []),
-      platform = (json['platform'] as Map<String, dynamic>? ?? const {})
-        .map((key, value) => MapEntry(
-            key,
-            PlatformEntry.fromJson(value as Map<String, dynamic>),
-          ));
+        pubspec = json['pubspec'] ?? {},
+        postInstall = List<String>.from(json['postInstall'] ?? []),
+        platform = (json['platform'] as Map<String, dynamic>? ?? const {})
+            .map((key, value) => MapEntry(
+                  key,
+                  PlatformEntry.fromJson(value as Map<String, dynamic>),
+                ));
 }
 
 class RegistryFile {

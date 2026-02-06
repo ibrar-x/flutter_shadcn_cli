@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### 🧭 Registry & Schema
+- **IMPROVED**: components.json schema validation now uses JSON Schema with `$schema` resolution and local fallback to `components.schema.json`.
+
+### 📦 Install Manifests
+- **NEW**: Per-component install manifests at `.shadcn/components/<id>.json` (version/tags + audit data).
+- **IMPROVED**: `<installPath>/components.json` now stores component metadata (version/tags).
+
+### 🧰 Init & Install
+- **CHANGED**: `init --add` removed; pass components positionally (e.g., `flutter_shadcn init button dialog`).
+- **IMPROVED**: Shared dependency closure for init/shared installs, plus cross-registry file dependency resolution.
+
+### 🧪 Tests
+- **NEW**: Integration tests validating CLI install behavior and schema validation.
+
 ## 0.1.8
 
 ### 🎯 Component Discovery

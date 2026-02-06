@@ -160,20 +160,40 @@ class FeedbackManager {
     );
   }
   
-  /// Submits feedback by opening GitHub issue
+  /// Submits feedback by creating GitHub issue via gh CLI or browser
   Future<void> _submitFeedback({
     required FeedbackType feedbackType,
     required String title,
     required String description,
   }) async {
-    // Build GitHub issue URL
+    print('');
+    
+    // Try gh CLI first (direct issue creation without browser)
+    final ghAvailable = await _isGitHubCliAvailable();
+    if (ghAvailable) {
+      final success = await _createIssueViaGh(
+        type: feedbackType,
+        title: title,
+        description: description,
+      );
+      
+      if (success) {
+        logger.success('Thank you for your feedback! 🙏');
+        return;
+      }
+      
+      // If gh fails, fall through to browser method
+      logger.warn('GitHub CLI failed, falling back to browser...');
+      print('');
+    }
+    
+    // Fallback: Build GitHub issue URL and open in browser
     final issueUrl = _buildGitHubIssueUrl(
       type: feedbackType,
       title: title,
       description: description,
     );
     
-    print('');
     logger.info('Opening GitHub issue in your browser...');
     print('');
     print('If it doesn\'t open automatically, visit:');
@@ -184,6 +204,78 @@ class FeedbackManager {
     await _openInBrowser(issueUrl);
     
     logger.success('Thank you for your feedback! 🙏');
+  }
+  
+  /// Checks if GitHub CLI (gh) is installed and authenticated
+  Future<bool> _isGitHubCliAvailable() async {
+    try {
+      final result = await Process.run('gh', ['--version']);
+      return result.exitCode == 0;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// Creates a GitHub issue using gh CLI
+  Future<bool> _createIssueViaGh({
+    required FeedbackType type,
+    required String title,
+    required String description,
+  }) async {
+    try {
+      logger.info('Creating issue via GitHub CLI...');
+      
+      // Build issue body with template
+      final filledTemplate = _fillTemplate(type.template, description);
+      final issueBody = '''
+$filledTemplate
+
+---
+**CLI Version:** v0.1.8
+**OS:** ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
+**Dart:** ${Platform.version}
+''';
+      
+      // Create issue using gh CLI
+      final labels = type.labels.join(',');
+      final issueTitle = '${type.emoji} $title';
+      
+      final result = await Process.run('gh', [
+        'issue',
+        'create',
+        '--repo',
+        '$repoOwner/$repoName',
+        '--title',
+        issueTitle,
+        '--body',
+        issueBody,
+        '--label',
+        labels,
+      ]);
+      
+      if (result.exitCode == 0) {
+        print('');
+        logger.success('Issue created successfully! ✨');
+        
+        // Extract and display issue URL from output
+        final output = result.stdout.toString().trim();
+        if (output.isNotEmpty) {
+          print('');
+          print('\x1B[36m$output\x1B[0m');
+        }
+        
+        return true;
+      } else {
+        // Check for authentication errors
+        final stderr = result.stderr.toString();
+        if (stderr.contains('not logged') || stderr.contains('authentication')) {
+          logger.warn('GitHub CLI not authenticated. Run: gh auth login');
+        }
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
   }
   
   String _buildGitHubIssueUrl({
@@ -332,71 +424,167 @@ enum FeedbackType {
     switch (this) {
       case FeedbackType.bug:
         return '''
+## Bug Description
+<!-- Describe what's wrong -->
+
+## Steps to Reproduce
+<!-- Provide detailed steps to reproduce the issue -->
+1. Run command: `flutter_shadcn ...`
+2. 
+3. 
+
 ## Expected Behavior
 <!-- What should happen? -->
 
 ## Actual Behavior
-<!-- What actually happens? -->
+<!-- What actually happens? Include error messages if any -->
 
-## Steps to Reproduce
-1. 
-2. 
-3. 
+## Environment Details
+<!-- Additional context that might be relevant -->
+- **Component/Feature**: <!-- e.g., init, add, theme, install-skill -->
+- **Project Type**: <!-- e.g., new project, existing project -->
+- **Error Messages**: 
+```
+<!-- Paste error output here if applicable -->
+```
 
-## Additional Context
-<!-- Screenshots, error messages, etc. -->
+## Screenshots/Logs
+<!-- Add screenshots or relevant log files if helpful -->
 ''';
       case FeedbackType.feature:
         return '''
 ## Problem Statement
-<!-- What problem does this solve? -->
+<!-- What problem are you trying to solve? Why is this needed? -->
 
 ## Proposed Solution
-<!-- How should it work? -->
+<!-- How should this feature work? Describe the ideal behavior -->
+
+## Use Cases
+<!-- Provide specific examples of when/how this would be used -->
+1. 
+2. 
+
+## Proposed API/Commands
+<!-- If applicable, show example commands or usage -->
+```bash
+# Example usage
+flutter_shadcn ...
+```
 
 ## Alternatives Considered
-<!-- What other approaches did you think about? -->
+<!-- What other approaches did you consider? Why is this approach better? -->
 
 ## Additional Context
-<!-- Examples, mockups, references, etc. -->
+<!-- Mockups, diagrams, references to similar features in other tools, etc. -->
 ''';
       case FeedbackType.documentation:
         return '''
 ## Documentation Issue
-<!-- What's wrong or missing in the docs? -->
-
-## Suggested Improvement
-<!-- How should it be improved? -->
+<!-- What's unclear, missing, incorrect, or confusing in the docs? -->
 
 ## Location
-<!-- Which file or page? -->
+<!-- Where is the issue? -->
+- **File/Page**: <!-- e.g., README.md, specific command docs -->
+- **Section**: <!-- e.g., "Installation", "Commands", specific heading -->
+- **URL**: <!-- If applicable -->
+
+## Current State
+<!-- What does the documentation currently say (or not say)? -->
+
+## Suggested Improvement
+<!-- How should it be improved? What would make it clearer? -->
+
+## Why This Matters
+<!-- Who would benefit from this improvement? What confusion does it prevent? -->
+
+## Example/Code Snippet
+<!-- If applicable, show example of clearer documentation or code sample that should be documented -->
+```bash
+# Example of what should be documented
+```
 ''';
       case FeedbackType.question:
         return '''
 ## Question
-<!-- What would you like to know? -->
-
-## What I've Tried
-<!-- What have you already attempted? -->
+<!-- What would you like to know? Be as specific as possible -->
 
 ## Context
-<!-- What are you trying to accomplish? -->
+<!-- What are you trying to accomplish? Describe your goal -->
+
+## What I've Tried
+<!-- What approaches have you already attempted? -->
+1. 
+2. 
+
+## Related Commands/Features
+<!-- Which CLI commands or features are you working with? -->
+
+## Expected Outcome
+<!-- What result are you hoping to achieve? -->
+
+## Code/Configuration
+<!-- Share relevant commands, config files, or code snippets -->
+```bash
+# Commands you've run
+```
+
+```json
+// Config files if relevant
+```
 ''';
       case FeedbackType.performance:
         return '''
 ## Performance Issue
-<!-- What operation is slow? -->
+<!-- What operation is slow or consuming excessive resources? -->
 
 ## Impact
-<!-- How does it affect your workflow? -->
+<!-- How does this affect your workflow? -->
+- **Operation Time**: <!-- e.g., "takes 30 seconds, expected 5 seconds" -->
+- **Frequency**: <!-- e.g., "happens every time", "intermittent" -->
+- **Severity**: <!-- e.g., "blocks development", "minor annoyance" -->
 
-## Environment
-<!-- Project size, file count, etc. -->
+## Steps to Reproduce
+<!-- How can we reproduce the performance issue? -->
+1. 
+2. 
+3. 
+
+## Environment Details
+<!-- Details that might affect performance -->
+- **Project Size**: <!-- e.g., "500+ components", "small test project" -->
+- **Number of Components**: 
+- **Registry Type**: <!-- local or remote -->
+- **Internet Speed**: <!-- if using remote registry -->
+- **System Resources**: <!-- RAM, CPU if relevant -->
+
+## Measurements
+<!-- If you have timing data, profiling results, or logs -->
+```
+<!-- Paste relevant performance data here -->
+```
+
+## Expected Performance
+<!-- What would be acceptable performance? -->
 ''';
       case FeedbackType.other:
         return '''
 ## Feedback
-<!-- Share your thoughts -->
+<!-- Share your thoughts, suggestions, or general comments -->
+
+## Category
+<!-- What aspect of the CLI does this relate to? -->
+- [ ] User Experience
+- [ ] Developer Experience
+- [ ] Design/Aesthetics
+- [ ] Workflow/Process
+- [ ] Integration with other tools
+- [ ] Other: ___________
+
+## Details
+<!-- Provide as much context as you'd like -->
+
+## Suggestions
+<!-- If you have ideas for improvement, share them here -->
 ''';
     }
   }

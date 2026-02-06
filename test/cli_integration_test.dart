@@ -40,7 +40,7 @@ void main() {
       }
     });
 
-    test('add installs component via CLI main', () async {
+    test('add installs component and writes manifests', () async {
       await cli.main([
         'add',
         'button',
@@ -60,12 +60,48 @@ void main() {
       );
       expect(File(p.join(installDir, 'button.dart')).existsSync(), isTrue);
       expect(File(p.join(installDir, 'meta.json')).existsSync(), isTrue);
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'shared',
+            'theme',
+            'theme.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+
+      final manifestFile = File(
+        p.join(appRoot.path, '.shadcn', 'components', 'button.json'),
+      );
+      expect(manifestFile.existsSync(), isTrue);
+      final manifestData =
+          jsonDecode(manifestFile.readAsStringSync()) as Map<String, dynamic>;
+      expect(manifestData['id'], 'button');
+      expect(manifestData['version'], '1.0.0');
+      expect(manifestData['tags'], contains('core'));
+
+      final installManifest = File(
+        p.join(appRoot.path, 'lib', 'ui', 'shadcn', 'components.json'),
+      );
+      expect(installManifest.existsSync(), isTrue);
+      final installData = jsonDecode(installManifest.readAsStringSync())
+          as Map<String, dynamic>;
+      final meta = installData['componentMeta'] as Map<String, dynamic>;
+      final buttonMeta = meta['button'] as Map<String, dynamic>;
+      expect(buttonMeta['version'], '1.0.0');
+      expect(buttonMeta['tags'], contains('core'));
 
       final aliasFile = File(
         p.join(appRoot.path, 'lib', 'ui', 'shadcn', 'app_components.dart'),
       );
       expect(aliasFile.existsSync(), isTrue);
-      expect(aliasFile.readAsStringSync().contains('typedef AppButton = Button;'),
+      expect(
+          aliasFile.readAsStringSync().contains('typedef AppButton = Button;'),
           isTrue);
     });
 
@@ -79,11 +115,10 @@ void main() {
       ]);
     });
 
-    test('init --add installs multiple widgets', () async {
+    test('init installs positional components', () async {
       await cli.main([
         'init',
         '--yes',
-        '--add',
         'button',
         'dialog',
         '--registry',
@@ -123,8 +158,9 @@ void main() {
 
 void _writeRegistryFixtures(Directory registryRoot) {
   final root = p.dirname(registryRoot.path);
-  final componentsDir = Directory(p.join(root, 'registry', 'components', 'button'))
-    ..createSync(recursive: true);
+  final componentsDir =
+      Directory(p.join(root, 'registry', 'components', 'button'))
+        ..createSync(recursive: true);
   final dialogDir = Directory(p.join(root, 'registry', 'components', 'dialog'))
     ..createSync(recursive: true);
   final sharedThemeDir = Directory(p.join(root, 'registry', 'shared', 'theme'))
@@ -137,17 +173,20 @@ void _writeRegistryFixtures(Directory registryRoot) {
   File(p.join(componentsDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"button"}');
 
-    File(p.join(dialogDir.path, 'dialog.dart'))
+  File(p.join(dialogDir.path, 'dialog.dart'))
       .writeAsStringSync('class Dialog {}');
-    File(p.join(dialogDir.path, 'meta.json'))
+  File(p.join(dialogDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"dialog"}');
 
-    File(p.join(sharedThemeDir.path, 'theme.dart'))
+  File(p.join(sharedThemeDir.path, 'theme.dart'))
       .writeAsStringSync('class ThemeHelper {}');
-    File(p.join(sharedUtilDir.path, 'util.dart'))
+  File(p.join(sharedUtilDir.path, 'util.dart'))
       .writeAsStringSync('class UtilHelper {}');
 
   final registryJson = {
+    'schemaVersion': 1,
+    'name': 'test_registry',
+    'flutter': {'minSdk': '>=3.3.0'},
     'defaults': {
       'installPath': 'lib/ui/shadcn',
       'sharedPath': 'lib/ui/shadcn/shared',
@@ -176,25 +215,34 @@ void _writeRegistryFixtures(Directory registryRoot) {
       {
         'id': 'button',
         'name': 'Button',
+        'description': 'Button component',
+        'category': 'control',
+        'version': '1.0.0',
+        'tags': ['core'],
         'files': [
           {
             'source': 'registry/components/button/button.dart',
-            'destination': '{installPath}/components/button/button.dart'
+            'destination': '{installPath}/components/button/button.dart',
+            'dependsOn': ['registry/shared/theme/theme.dart']
           },
           {
             'source': 'registry/components/button/meta.json',
             'destination': '{installPath}/components/button/meta.json'
           }
         ],
-        'shared': [],
+        'shared': ['theme'],
         'dependsOn': [],
-        'pubspec': {
-          'dependencies': {}
-        }
+        'pubspec': {'dependencies': {}},
+        'assets': [],
+        'postInstall': []
       },
       {
         'id': 'dialog',
         'name': 'Dialog',
+        'description': 'Dialog component',
+        'category': 'overlay',
+        'version': '0.1.0',
+        'tags': ['overlay'],
         'files': [
           {
             'source': 'registry/components/dialog/dialog.dart',
@@ -207,15 +255,15 @@ void _writeRegistryFixtures(Directory registryRoot) {
         ],
         'shared': [],
         'dependsOn': ['button'],
-        'pubspec': {
-          'dependencies': {}
-        }
+        'pubspec': {'dependencies': {}},
+        'assets': [],
+        'postInstall': []
       }
     ]
   };
 
-  File(p.join(registryRoot.path, 'components.json'))
-      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(registryJson));
+  File(p.join(registryRoot.path, 'components.json')).writeAsStringSync(
+      const JsonEncoder.withIndent('  ').convert(registryJson));
 }
 
 void _writePubspec(Directory targetRoot) {
@@ -227,5 +275,6 @@ void _writePubspec(Directory targetRoot) {
     ..writeln('  flutter:')
     ..writeln('    sdk: flutter');
 
-  File(p.join(targetRoot.path, 'pubspec.yaml')).writeAsStringSync(buffer.toString());
+  File(p.join(targetRoot.path, 'pubspec.yaml'))
+      .writeAsStringSync(buffer.toString());
 }
