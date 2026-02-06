@@ -11,7 +11,30 @@ class FeedbackManager {
   FeedbackManager({required this.logger});
   
   /// Shows feedback menu and handles user selection
-  Future<void> showFeedbackMenu() async {
+  /// If [typeStr], [titleStr], and [bodyStr] are provided, skips interactive mode
+  Future<void> showFeedbackMenu({
+    String? type,
+    String? title,
+    String? body,
+  }) async {
+    // Non-interactive mode if all parameters provided
+    if (type != null && title != null && body != null) {
+      final feedbackType = _parseFeedbackType(type);
+      if (feedbackType == null) {
+        logger.error('Invalid feedback type: $type');
+        logger.info('Valid types: bug, feature, docs, question, performance, other');
+        return;
+      }
+      
+      await _submitFeedback(
+        feedbackType: feedbackType,
+        title: title,
+        description: body,
+      );
+      return;
+    }
+    
+    // Interactive mode
     logger.section('💬 Feedback & Support');
     print('');
     print('Help us improve flutter_shadcn_cli! Choose feedback type:');
@@ -27,19 +50,19 @@ class FeedbackManager {
     stdout.write('\x1B[1m❯\x1B[0m Select feedback type (1-6): ');
     final input = stdin.readLineSync()?.trim() ?? '';
     
-    final type = int.tryParse(input);
-    if (type == null || type < 1 || type > 6) {
+    final typeNum = int.tryParse(input);
+    if (typeNum == null || typeNum < 1 || typeNum > 6) {
       logger.error('Invalid selection. Please choose 1-6.');
       return;
     }
     
-    await _handleFeedbackType(type);
+    await _handleFeedbackType(typeNum);
   }
   
-  Future<void> _handleFeedbackType(int type) async {
+  Future<void> _handleFeedbackType(int typeNum) async {
     final FeedbackType feedbackType;
     
-    switch (type) {
+    switch (typeNum) {
       case 1:
         feedbackType = FeedbackType.bug;
         break;
@@ -64,6 +87,28 @@ class FeedbackManager {
     }
     
     await _collectAndSubmitFeedback(feedbackType);
+  }
+  
+  /// Parses feedback type string to FeedbackType enum
+  FeedbackType? _parseFeedbackType(String type) {
+    switch (type.toLowerCase()) {
+      case 'bug':
+        return FeedbackType.bug;
+      case 'feature':
+        return FeedbackType.feature;
+      case 'docs':
+      case 'documentation':
+        return FeedbackType.documentation;
+      case 'question':
+        return FeedbackType.question;
+      case 'performance':
+      case 'perf':
+        return FeedbackType.performance;
+      case 'other':
+        return FeedbackType.other;
+      default:
+        return null;
+    }
   }
   
   Future<void> _collectAndSubmitFeedback(FeedbackType type) async {
@@ -108,9 +153,22 @@ class FeedbackManager {
       return;
     }
     
+    await _submitFeedback(
+      feedbackType: type,
+      title: title,
+      description: description,
+    );
+  }
+  
+  /// Submits feedback by opening GitHub issue
+  Future<void> _submitFeedback({
+    required FeedbackType feedbackType,
+    required String title,
+    required String description,
+  }) async {
     // Build GitHub issue URL
     final issueUrl = _buildGitHubIssueUrl(
-      type: type,
+      type: feedbackType,
       title: title,
       description: description,
     );

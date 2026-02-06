@@ -165,7 +165,10 @@ Future<void> main(List<String> arguments) async {
     ..addCommand(
       'feedback',
       ArgParser()
-        ..addFlag('help', abbr: 'h', negatable: false),
+        ..addFlag('help', abbr: 'h', negatable: false)
+        ..addOption('type', abbr: 't', help: 'Feedback type: bug, feature, docs, question, performance, other')
+        ..addOption('title', help: 'Issue title')
+        ..addOption('body', help: 'Issue description/body'),
     );
 
   ArgResults argResults;
@@ -877,24 +880,37 @@ Future<void> main(List<String> arguments) async {
     case 'feedback':
       final feedbackCommand = argResults.command!;
       if (feedbackCommand['help'] == true) {
-        print('Usage: flutter_shadcn feedback');
+        print('Usage: flutter_shadcn feedback [options]');
         print('');
         print('Submit feedback or report issues via GitHub.');
         print('');
-        print('Opens an interactive menu to help you:');
-        print('  🐛 Report bugs');
-        print('  ✨ Request features');
-        print('  📖 Suggest documentation improvements');
-        print('  ❓ Ask questions');
-        print('  ⚡ Report performance issues');
-        print('  💡 Share general feedback');
+        print('Interactive mode (default):');
+        print('  flutter_shadcn feedback');
+        print('');
+        print('Non-interactive mode:');
+        print('  flutter_shadcn feedback --type bug --title "Title" --body "Description"');
+        print('');
+        print('Feedback types:');
+        print('  🐛 bug          Report bugs');
+        print('  ✨ feature      Request features');
+        print('  📖 docs         Suggest documentation improvements');
+        print('  ❓ question     Ask questions');
+        print('  ⚡ performance  Report performance issues');
+        print('  💡 other        Share general feedback');
         print('');
         print('Options:');
-        print('  --help, -h   Show this message');
+        print('  --type, -t    Feedback type (bug, feature, docs, question, performance, other)');
+        print('  --title       Issue title');
+        print('  --body        Issue description/body');
+        print('  --help, -h    Show this message');
         exit(0);
       }
       final feedbackMgr = FeedbackManager(logger: logger);
-      await feedbackMgr.showFeedbackMenu();
+      await feedbackMgr.showFeedbackMenu(
+        type: feedbackCommand['type'] as String?,
+        title: feedbackCommand['title'] as String?,
+        body: feedbackCommand['body'] as String?,
+      );
       break;
   }
 }
