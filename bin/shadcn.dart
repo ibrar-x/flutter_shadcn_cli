@@ -941,7 +941,7 @@ Future<void> main(List<String> arguments) async {
         print('Feedback types:');
         print('  🐛 bug          Report bugs');
         print('  ✨ feature      Request features');
-        print('  📖 docs         Suggest documentation improvements');
+        print('  📖 docs        Suggest documentation improvements');
         print('  ❓ question     Ask questions');
         print('  ⚡ performance  Report performance issues');
         print('  💡 other        Share general feedback');

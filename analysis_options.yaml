@@ -8,5 +8,5 @@ analyzer:
     - '../comparison_app/**'
     - '../playground/**'
     - '../tools/**'
-    - '../docs/**'
+    - '../doc/**'
     - '../shadcn_flutter_cli/templates/**'

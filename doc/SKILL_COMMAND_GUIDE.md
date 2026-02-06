@@ -84,7 +84,7 @@ This will:
 
 Based on `skill.json` (which stays in registry for CLI management), the command copies:
 
-- **SKILL.md** - Main skill documentation (AI instructions)
+- **SKILL.md** - Main skill docsumentation (AI instructions)
 - **INSTALLATION.md** - Installation guide
 - **README.md** - Skill overview (if exists)
 - **references/commands.md** - CLI command reference

@@ -96,6 +96,7 @@ class FeedbackManager {
         return FeedbackType.bug;
       case 'feature':
         return FeedbackType.feature;
+      case 'doc':
       case 'docs':
       case 'documentation':
         return FeedbackType.documentation;

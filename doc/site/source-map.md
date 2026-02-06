@@ -32,19 +32,19 @@ No headings found.
 ## shadcn_flutter_cli/CLI_FULL_DOCUMENTATION.md
 
 - **CLI Markdown Documentation (shadcn_flutter_cli)**: Scope: Markdown files under shadcn_flutter_cli only.
-  - **Tree (Markdown Files Only)**: shadcn_flutter_cli/ CHANGELOG.md FEEDBACK_FEATURE.md README.md .dart_tool/extension_discovery/README.md docs/ DOCUMENTATION.md FEATURE_SUMMARY.md FULL_COMMANDS_DOCS.md MANIFEST_REQUIREMENT.md SKILLS_JSON_DISCOVERY.md SKILL_COMMAND_GUIDE.md SKILL_COMMAND_IMPLEMENTATION.md test/ README.md
+  - **Tree (Markdown Files Only)**: shadcn_flutter_cli/ CHANGELOG.md FEEDBACK_FEATURE.md README.md .dart_tool/extension_discovery/README.md doc/ DOCUMENTATION.md FEATURE_SUMMARY.md FULL_COMMANDS_DOCS.md MANIFEST_REQUIREMENT.md SKILLS_JSON_DISCOVERY.md SKILL_COMMAND_GUIDE.md SKILL_COMMAND_IMPLEMENTATION.md test/ README.md
   - **Definitions and Examples**: Section content describes this topic.
     - **shadcn_flutter_cli/README.md**: Definition: Primary entrypoint for users. It explains installation, quick start, configuration, commands, and troubleshooting for the CLI. Example:
     - **shadcn_flutter_cli/CHANGELOG.md**: Definition: Versioned change history of the CLI with release notes and feature summaries. Example:
     - **shadcn_flutter_cli/FEEDBACK_FEATURE.md**: Definition: Detailed specification of the feedback command, including categories, templates, and GitHub issue behavior. Example:
     - **shadcn_flutter_cli/.dart_tool/extension_discovery/README.md**: Definition: Cache readme for extension discovery. It warns not to depend on this folder and describes cache behavior. Example:
-    - **shadcn_flutter_cli/docs/DOCUMENTATION.md**: Definition: High-level CLI documentation covering architecture, flow, commands, and key concepts like registry, manifest, and state. Example:
-    - **shadcn_flutter_cli/docs/FEATURE_SUMMARY.md**: Definition: Implementation summary of component discovery and skill installation features, including architecture notes and examples. Example:
-    - **shadcn_flutter_cli/docs/FULL_COMMANDS_DOCS.md**: Definition: Comprehensive documentation for every CLI command, including inputs, outputs, file usage, and rationale. Example:
-    - **shadcn_flutter_cli/docs/MANIFEST_REQUIREMENT.md**: Definition: Explains the skill.json or skill.yaml requirement for install-skill, with examples and error cases. Example:
-    - **shadcn_flutter_cli/docs/SKILLS_JSON_DISCOVERY.md**: Definition: Describes the skills.json discovery index, interactive multi-skill install flow, and AI model display names. Example:
-    - **shadcn_flutter_cli/docs/SKILL_COMMAND_GUIDE.md**: Definition: End-to-end user guide for install-skill, including modes, discovery, symlinks, and troubleshooting. Example:
-    - **shadcn_flutter_cli/docs/SKILL_COMMAND_IMPLEMENTATION.md**: Definition: Implementation-focused summary of install-skill behavior, file copying, and search algorithm. Example:
+    - **shadcn_flutter_cli/doc/DOCUMENTATION.md**: Definition: High-level CLI documentation covering architecture, flow, commands, and key concepts like registry, manifest, and state. Example:
+    - **shadcn_flutter_cli/doc/FEATURE_SUMMARY.md**: Definition: Implementation summary of component discovery and skill installation features, including architecture notes and examples. Example:
+    - **shadcn_flutter_cli/doc/FULL_COMMANDS_DOCS.md**: Definition: Comprehensive documentation for every CLI command, including inputs, outputs, file usage, and rationale. Example:
+    - **shadcn_flutter_cli/doc/MANIFEST_REQUIREMENT.md**: Definition: Explains the skill.json or skill.yaml requirement for install-skill, with examples and error cases. Example:
+    - **shadcn_flutter_cli/doc/SKILLS_JSON_DISCOVERY.md**: Definition: Describes the skills.json discovery index, interactive multi-skill install flow, and AI model display names. Example:
+    - **shadcn_flutter_cli/doc/SKILL_COMMAND_GUIDE.md**: Definition: End-to-end user guide for install-skill, including modes, discovery, symlinks, and troubleshooting. Example:
+    - **shadcn_flutter_cli/doc/SKILL_COMMAND_IMPLEMENTATION.md**: Definition: Implementation-focused summary of install-skill behavior, file copying, and search algorithm. Example:
     - **shadcn_flutter_cli/test/README.md**: Definition: Overview of the CLI test suite, coverage areas, and how to run tests. Example:
 
 ## shadcn_flutter_cli/FEEDBACK_FEATURE.md
@@ -138,7 +138,7 @@ No headings found.
   - **New Updates**: - Component discovery system: `list`, `search`, `info` commands for browsing registry. - Intelligent index.json caching with 24-hour staleness policy. - Local index.json support with remote fallback. - Dry-run preview for dependencies, assets, and platform changes. - Interactive AI skill manager with model folder auto-discovery. - Symlink support for sharing skills across multiple AI models. - Skills URL override with `--skills-url`. - Doctor validates components.json schema and reports cache location. - One‑line setup with init `<components>` or `--all`. - Local dev mode saved with --dev. - Optional file toggles (README.md, meta.json, preview.dart). - Folder alias support with @alias paths. - Init installs core shared helpers + required deps by default. - `assets` command for installing icon/typography fonts. - Init flags for installing icons/fonts on demand. - Dependency updates are batched for faster installs/removals. - remove --all cleans empty parent folders after deleting files. - Platform targets can be configured via the platform command.
   - **CLI Acknowledgements**: This copy–paste CLI was built from the ground up to make it easy to browse, configure and install Widgets into your Flutter projects. While many of the widgets and design tokens in this kit are adapted from the excellent shadcn_flutter library (https://github.com/sunarya-thito/shadcn_flutter), the CLI itself is an original tool designed specifically for our registry/studio workflow. It does not reuse or derive code from the official shadcn/ui CLI or other third‑party CLIs.
 
-## shadcn_flutter_cli/docs/DOCUMENTATION.md
+## shadcn_flutter_cli/doc/DOCUMENTATION.md
 
 - **CLI Documentation (flutter_shadcn_cli)**: Section content describes this topic.
   - **Overview**: `flutter_shadcn_cli` is a copy‑paste installer for the shadcn Flutter registry. It pulls components and shared helpers into a Flutter app, manages optional files, and keeps dependencies in sync.
@@ -162,7 +162,7 @@ No headings found.
   - **Common Tasks**: - **Add a new flag**: update `bin/shadcn.dart`, wire behavior in `installer.dart`. - **Add new registry metadata**: update `registry/components.json` and loaders. - **Adjust dependency logic**: update `_syncDependenciesWithInstalled`.
   - **Known Constraints**: - Install/shared paths must be inside `lib/`. - Theme application assumes `color_scheme.dart` matches expected structure.
 
-## shadcn_flutter_cli/docs/FEATURE_SUMMARY.md
+## shadcn_flutter_cli/doc/FEATURE_SUMMARY.md
 
 - **CLI Feature Implementation Summary**: Section content describes this topic.
   - **Overview**: Implemented comprehensive component discovery and interactive AI skill installation system for the shadcn_flutter CLI.
@@ -192,7 +192,7 @@ No headings found.
   - **Commit History**: - **f8c569e**: Added intelligent component discovery and interactive skill installer - IndexLoader with caching (24h staleness) - Discovery commands (list/search/info) - SkillManager with model folder discovery - Interactive installation with multiple modes - Comprehensive help text with examples
   - **Future Enhancements**: 1. Implement actual file download from GitHub in `_downloadSkillFiles()` 2. Add skill validation and dependency checking 3. Skill versioning support 4. Cross-model skill synchronization 5. Skill marketplace integration
 
-## shadcn_flutter_cli/docs/FULL_COMMANDS_DOCS.md
+## shadcn_flutter_cli/doc/FULL_COMMANDS_DOCS.md
 
 - **Flutter Shadcn CLI - Complete Commands Documentation**: This document provides comprehensive documentation for every command in `flutter_shadcn_cli`, including what each command does, which files it uses, and why.
   - **Table of Contents**: 1. [init](#init) 2. [add](#add) 3. [remove](#remove) 4. [dry-run](#dry-run) 5. [assets](#assets) 6. [platform](#platform) 7. [theme](#theme) 8. [sync](#sync) 9. [doctor](#doctor) 10. [list](#list) 11. [search](#search) 12. [info](#info) 13. [install-skill](#install-skill) 14. [version](#version) 15. [upgrade](#upgrade) 16. [feedback](#feedback)
@@ -315,7 +315,7 @@ No headings found.
 - **List installed skills by model (shows which models have which skills)**: flutter_shadcn install-skill --list
 - **List available skills from registry**: flutter_shadcn install-skill --available
 - **Show verbose output**: flutter_shadcn install-skill --verbose --skill flutter-shadcn-ui --model .claude
-    - **Files Used**: | File Path | Purpose | Why | |-----------|---------|-----| | `.shadcn/config.json` | Registry configuration | Reads registry URL as default skills source | | `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}/` | Primary skill source | Local kit registry with skill files | | `../skills/{skillId}/` | Parent directory skill source | Searches up directory tree for skills folder | | `skills/{skillId}/` | Project root skill source | Local skills in project | | `{skillId}/skill.json` | Skill manifest | Defines which files to copy and compatibility | | `{skillId}/skill.yaml` | Alternative manifest | Optional YAML format manifest | | `{skillId}/SKILL.md` | Main skill doc | AI instructions and knowledge base | | `{skillId}/INSTALLATION.md` | Installation guide | How to deploy skill to AI models | | `{skillId}/references/*.md` | Reference docs | Commands, schemas, examples | | `<projectRoot>/.claude/skills/{skillId}/` | Claude skill location | Copies skill files for Claude AI | | `<projectRoot>/.gpt4/skills/{skillId}/` | GPT-4 skill location | Copies skill files for ChatGPT | | `<projectRoot>/.cursor/skills/{skillId}/` | Cursor skill location | Copies skill files for Cursor AI | | `<projectRoot>/.gemini/skills/{skillId}/` | Gemini skill location | Copies skill files for Google Gemini | | `<model>/skills/{skillId}/manifest.json` | Install tracking | Records installation metadata |
+    - **Files Used**: | File Path | Purpose | Why | |-----------|---------|-----| | `.shadcn/config.json` | Registry configuration | Reads registry URL as default skills source | | `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}/` | Primary skill source | Local kit registry with skill files | | `../skills/{skillId}/` | Parent directory skill source | Searches up directory tree for skills folder | | `skills/{skillId}/` | Project root skill source | Local skills in project | | `{skillId}/skill.json` | Skill manifest | Defines which files to copy and compatibility | | `{skillId}/skill.yaml` | Alternative manifest | Optional YAML format manifest | | `{skillId}/SKILL.md` | Main skill docs | AI instructions and knowledge base | | `{skillId}/INSTALLATION.md` | Installation guide | How to deploy skill to AI models | | `{skillId}/references/*.md` | Reference docs | Commands, schemas, examples | | `<projectRoot>/.claude/skills/{skillId}/` | Claude skill location | Copies skill files for Claude AI | | `<projectRoot>/.gpt4/skills/{skillId}/` | GPT-4 skill location | Copies skill files for ChatGPT | | `<projectRoot>/.cursor/skills/{skillId}/` | Cursor skill location | Copies skill files for Cursor AI | | `<projectRoot>/.gemini/skills/{skillId}/` | Gemini skill location | Copies skill files for Google Gemini | | `<model>/skills/{skillId}/manifest.json` | Install tracking | Records installation metadata |
     - **Why These Files**: - **`.shadcn/config.json`**: Provides registry URL which defaults as skills source location. - **Local kit registry paths**: Searches multiple locations to find skill source files without requiring manual configuration. - **skill.json manifest**: Declares files structure, allows CLI to copy correct files with proper paths. - **AI model folders** (`.claude`, `.gpt4`, etc.): Hidden folders where AI assistants read skills and prompts; auto-discovery eliminates manual configuration. - **Skill documentation files**: Provide AI models with complete knowledge of CLI commands, component patterns, troubleshooting, and best practices. - **manifest.json tracking**: Records which skills are installed where, enabling list/uninstall functionality.
     - **Installation Modes**: **Automatic (Context-Aware - Default)**: The CLI intelligently selects the best mode based on what's already installed:
     - **Skill Discovery Algorithm**: The CLI searches for skills in this order: 1. Local registry in kit: `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}` (searches up from project root) 2. Parent directories: `../skills/{skillId}` (recursively searches up directory tree) 3. Project root: `./skills/{skillId}` (local skills folder in project) 4. Custom URL: If `--skills-url` specified, tries that path first 5. Error: Throws helpful error if skill manifest not found (skill.json or skill.yaml required)
@@ -358,7 +358,7 @@ No headings found.
   - **Diagram: Command Dependency Flow**: init ────────┬────────────────────────────┐ │                            │ ▼                            ▼ Creates config.json          Creates components.json │                            │ ┌────────┴─────────────┐       ┌─────┴──────────────┐ │                      │       │                    │ ▼                      ▼       ▼                    ▼ add                 remove    dry-run              (tracks │                      │        │              installed) ├─→ Installs        Removes   Previews │    components     components installs │                      │ │    ┌─────────────────┘ │    │ │    └──→ Both use registry/components.json │         and <installPath>/components.json │ └──→ theme ←──┐ │ Updates  color_scheme.dart │ └──→ All components inherit theme
   - **Best Practices for File Management**: 1. **Never manually edit `<installPath>/components.json`** - Let CLI manage it via add/remove commands. 2. **Backup `.shadcn/config.json`** before major changes; it controls entire project setup. 3. **Use `flutter_shadcn doctor`** to validate setup before troubleshooting issues. 4. **Clear cache with `--refresh`** if discovering new components in development. 5. **Use `dry-run` before `add`** to preview dependencies and understand scope. 6. **Keep `components.schema.json` in sync** with registry updates for validation to work. 7. **Use `--force` remove sparingly** - dependency checking prevents broken states.
 
-## shadcn_flutter_cli/docs/MANIFEST_REQUIREMENT.md
+## shadcn_flutter_cli/doc/MANIFEST_REQUIREMENT.md
 
 - **Skill Installation Manifest Requirement**: Section content describes this topic.
   - **Overview**: The `install-skill` command now **requires** either a `skill.json` or `skill.yaml` manifest file to be present in the skill directory. This ensures consistent, predictable skill installations driven by explicit configuration rather than implicit file discovery.
@@ -383,7 +383,7 @@ No headings found.
   - **Migration Guide**: If you have existing skills without manifests:
   - **See Also**: - [skill.json example](../shadcn_flutter_kit/flutter_shadcn_kit/skills/flutter-shadcn-ui/skill.json) - [SkillManager implementation](lib/src/skill_manager.dart) - [Test coverage](test/skill_manager_test.dart) - [CHANGELOG](CHANGELOG.md)
 
-## shadcn_flutter_cli/docs/SKILLS_JSON_DISCOVERY.md
+## shadcn_flutter_cli/doc/SKILLS_JSON_DISCOVERY.md
 
 - **Skills.json Discovery & Interactive Installation**: Section content describes this topic.
   - **Overview**: The CLI now supports: 1. **skills.json index** - Like `index.json` for components, but for skills 2. **Interactive multi-skill installation** - Install multiple skills at once 3. **Human-readable AI model names** - "Cursor" instead of ".cursor"
@@ -420,7 +420,7 @@ No headings found.
   - **Testing**: The implementation includes: - ✅ skills.json parsing and validation - ✅ AI model display name mapping - ✅ Multi-skill interactive flow - ✅ Integration with existing skill manager - ✅ Error handling for missing skills.json - ✅ Fallback to folder names if display name not found
   - **Migration Notes**: **No breaking changes** - All existing commands work as before, just enhanced: - Model names now show as "Cursor" instead of ".cursor" - New optional flags (`--available`, `--interactive`) - skills.json is optional - CLI works without it
 
-## shadcn_flutter_cli/docs/SKILL_COMMAND_GUIDE.md
+## shadcn_flutter_cli/doc/SKILL_COMMAND_GUIDE.md
 
 - **install-skill Command - Complete Guide**: Section content describes this topic.
   - **Overview**: The `install-skill` command manages AI model skills for shadcn Flutter development. It automatically discovers AI model folders (`.claude/`, `.gpt4/`, `.cursor/`, etc.) and installs skill files to enable AI-assisted component development.
@@ -482,7 +482,7 @@ No headings found.
   - **Version History**: - **v0.1.8**: Added install-skill command with auto-discovery and symlink support - **v0.1.9**: Enhanced local registry detection and file copying
   - **See Also**: - [cli-skill-command.md](./cli-skill-command.md) - Detailed implementation guide - [FULL_COMMANDS_DOCS.md](./FULL_COMMANDS_DOCS.md) - All CLI commands - [SKILL.md](../shadcn_flutter_kit/flutter_shadcn_kit/skills/flutter-shadcn-ui/SKILL.md) - The actual skill content
 
-## shadcn_flutter_cli/docs/SKILL_COMMAND_IMPLEMENTATION.md
+## shadcn_flutter_cli/doc/SKILL_COMMAND_IMPLEMENTATION.md
 
 - **install-skill Command Implementation Summary**: Section content describes this topic.
   - **What Was Done**: Successfully implemented real file copying functionality for the `install-skill` command in `flutter_shadcn_cli`. The command now copies actual skill documentation files from the local registry instead of creating placeholders.

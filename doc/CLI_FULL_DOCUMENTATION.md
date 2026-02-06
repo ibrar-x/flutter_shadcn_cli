@@ -10,7 +10,7 @@ shadcn_flutter_cli/
   FEEDBACK_FEATURE.md
   README.md
   .dart_tool/extension_discovery/README.md
-  docs/
+  doc/
     DOCUMENTATION.md
     FEATURE_SUMMARY.md
     FULL_COMMANDS_DOCS.md
@@ -52,49 +52,49 @@ Example:
 rm -rf shadcn_flutter_cli/.dart_tool/extension_discovery
 ```
 
-### shadcn_flutter_cli/docs/DOCUMENTATION.md
+### shadcn_flutter_cli/doc/DOCUMENTATION.md
 Definition: High-level CLI documentation covering architecture, flow, commands, and key concepts like registry, manifest, and state.
 Example:
 ```bash
 flutter_shadcn doctor
 ```
 
-### shadcn_flutter_cli/docs/FEATURE_SUMMARY.md
+### shadcn_flutter_cli/doc/FEATURE_SUMMARY.md
 Definition: Implementation summary of component discovery and skill installation features, including architecture notes and examples.
 Example:
 ```bash
 flutter_shadcn search button
 ```
 
-### shadcn_flutter_cli/docs/FULL_COMMANDS_DOCS.md
+### shadcn_flutter_cli/doc/FULL_COMMANDS_DOCS.md
 Definition: Comprehensive documentation for every CLI command, including inputs, outputs, file usage, and rationale.
 Example:
 ```bash
 flutter_shadcn dry-run button
 ```
 
-### shadcn_flutter_cli/docs/MANIFEST_REQUIREMENT.md
+### shadcn_flutter_cli/doc/MANIFEST_REQUIREMENT.md
 Definition: Explains the skill.json or skill.yaml requirement for install-skill, with examples and error cases.
 Example:
 ```bash
 flutter_shadcn install-skill --skill flutter-shadcn-ui --model .claude
 ```
 
-### shadcn_flutter_cli/docs/SKILLS_JSON_DISCOVERY.md
+### shadcn_flutter_cli/doc/SKILLS_JSON_DISCOVERY.md
 Definition: Describes the skills.json discovery index, interactive multi-skill install flow, and AI model display names.
 Example:
 ```bash
 flutter_shadcn install-skill --available
 ```
 
-### shadcn_flutter_cli/docs/SKILL_COMMAND_GUIDE.md
+### shadcn_flutter_cli/doc/SKILL_COMMAND_GUIDE.md
 Definition: End-to-end user guide for install-skill, including modes, discovery, symlinks, and troubleshooting.
 Example:
 ```bash
 flutter_shadcn install-skill --skill flutter-shadcn-ui --symlink --model .claude
 ```
 
-### shadcn_flutter_cli/docs/SKILL_COMMAND_IMPLEMENTATION.md
+### shadcn_flutter_cli/doc/SKILL_COMMAND_IMPLEMENTATION.md
 Definition: Implementation-focused summary of install-skill behavior, file copying, and search algorithm.
 Example:
 ```bash

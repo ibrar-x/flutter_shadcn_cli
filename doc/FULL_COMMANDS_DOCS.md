@@ -651,7 +651,7 @@ Intelligent multi-skill, multi-model AI skills manager. Auto-discovers 28+ hidde
 - Graceful error handling: batch operations skip missing folders instead of crashing
 
 **Files copied from skill:**
-- `SKILL.md` - Main skill documentation (AI instructions)
+- `SKILL.md` - Main skill docsumentation (AI instructions)
 - `INSTALLATION.md` - Installation guide
 - `README.md` - Skill overview (if exists)
 - `references/commands.md` - CLI command reference
@@ -718,7 +718,7 @@ flutter_shadcn install-skill --verbose --skill flutter-shadcn-ui --model .claude
 | `skills/{skillId}/` | Project root skill source | Local skills in project |
 | `{skillId}/skill.json` | Skill manifest | Defines which files to copy and compatibility |
 | `{skillId}/skill.yaml` | Alternative manifest | Optional YAML format manifest |
-| `{skillId}/SKILL.md` | Main skill doc | AI instructions and knowledge base |
+| `{skillId}/SKILL.md` | Main skill docs | AI instructions and knowledge base |
 | `{skillId}/INSTALLATION.md` | Installation guide | How to deploy skill to AI models |
 | `{skillId}/references/*.md` | Reference docs | Commands, schemas, examples |
 | `<projectRoot>/.claude/skills/{skillId}/` | Claude skill location | Copies skill files for Claude AI |
