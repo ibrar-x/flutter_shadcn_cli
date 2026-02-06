@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- (empty)
+
+## 0.1.9
+
 ### 🧭 Registry & Schema
 - **IMPROVED**: components.json schema validation now uses JSON Schema with `$schema` resolution and local fallback to `components.schema.json`.
 
