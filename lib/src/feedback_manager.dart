@@ -134,13 +134,13 @@ class FeedbackManager {
     required String description,
   }) {
     final labels = type.labels.join(',');
-    final issueTitle = Uri.encodeComponent('[${type.prefix}] $title');
+    final issueTitle = Uri.encodeComponent('${type.emoji} $title');
+    
+    // Replace the first comment placeholder with user's description
+    final filledTemplate = _fillTemplate(type.template, description);
     
     final issueBody = '''
-${type.template}
-
-## Description
-$description
+$filledTemplate
 
 ---
 **CLI Version:** v0.1.8
@@ -151,6 +151,21 @@ $description
     final encodedBody = Uri.encodeComponent(issueBody);
     
     return 'https://github.com/$repoOwner/$repoName/issues/new?title=$issueTitle&body=$encodedBody&labels=$labels';
+  }
+  
+  /// Fills the template by replacing the first comment placeholder with user input
+  String _fillTemplate(String template, String userInput) {
+    // Find the first comment placeholder (<!-- ... -->)
+    final commentRegex = RegExp(r'<!--[^>]*-->');
+    final match = commentRegex.firstMatch(template);
+    
+    if (match == null) {
+      // No placeholder found, just append user input at the end
+      return '${template.trim()}\n$userInput';
+    }
+    
+    // Replace the first comment with user input
+    return template.replaceFirst(commentRegex, userInput);
   }
   
   Future<void> _openInBrowser(String url) async {
