@@ -25,6 +25,10 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - **JSON output**: Pretty-printed `--json` output for list, search, info, doctor, and dry-run (automation friendly).
 - **Command aliases**: `ls` → `list`, `rm` → `remove`, `i` → `info`.
 - **Dry-run preview**: See dependencies, assets, and platform changes before install.
+- **Registry validation**: `validate` checks schema + registry file integrity.
+- **Audit tooling**: `audit` compares installed versions/tags vs registry and checks missing files.
+- **Dependency audit**: `deps` compares registry dependency requirements with `pubspec.yaml`.
+- **Offline mode**: `--offline` disables network calls and uses cached registry/index data.
 - **AI skill manager**: Interactive multi-skill installation with auto-discovery of 28+ AI model folders (.claude, .cursor, .gemini, etc.).
   - Human-readable model names (\"Cursor\", \"Claude (Anthropic)\", \"Codex (OpenAI)\")
   - Install multiple skills to multiple models in one flow
@@ -150,6 +154,53 @@ flutter_shadcn rm button
 flutter_shadcn ls
 flutter_shadcn i button
 ```
+
+## Automation & Diagnostics
+
+Pretty JSON output (for scripts):
+
+```bash
+flutter_shadcn list --json
+flutter_shadcn doctor --json
+flutter_shadcn dry-run button --json
+```
+
+Validate registry integrity:
+
+```bash
+flutter_shadcn validate
+```
+
+Audit installed components:
+
+```bash
+flutter_shadcn audit
+```
+
+Compare registry dependencies vs pubspec:
+
+```bash
+flutter_shadcn deps
+```
+
+Offline mode (cache-only):
+
+```bash
+flutter_shadcn list --offline --json
+```
+
+Exit codes (common):
+
+- `2` usage error
+- `10` registry not found
+- `20` schema invalid
+- `30` component missing
+- `31` file missing
+- `40` network error
+- `41` offline cache unavailable
+- `50` validation failed
+- `60` config invalid
+- `70` IO error
 
 ## One‑line setup (fast)
 

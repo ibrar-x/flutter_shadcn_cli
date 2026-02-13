@@ -12,10 +12,12 @@ Order of precedence:
 ## Behavior
 
 - Validation errors are reported in `doctor`
+- Full validation is available via `validate`
 - Validation warnings are logged during registry load
 
 ## Example
 
 ```bash
 flutter_shadcn doctor
+flutter_shadcn validate
 ```

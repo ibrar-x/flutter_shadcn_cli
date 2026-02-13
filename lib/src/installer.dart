@@ -11,6 +11,7 @@ import 'package:flutter_shadcn_cli/registry/shared/theme/preset_theme_data.dart'
     show RegistryThemePresetData;
 
 class Installer {
+  static const int _fileCopyConcurrency = 4;
   final Registry registry;
   final String targetDir; // The user's project root
   final CliLogger logger;
@@ -59,6 +60,16 @@ class Installer {
       await _ensureConfig();
     }
 
+    final config = await ShadcnConfig.load(targetDir);
+    if (!skipPrompts) {
+      _printInitSummary(config, themePreset);
+      final proceed = _confirmInitProceed();
+      if (!proceed) {
+        logger.warn('Initialization cancelled.');
+        return;
+      }
+    }
+
     const coreShared = [
       'theme',
       'util',
@@ -71,6 +82,21 @@ class Installer {
     ))
       ..removeWhere((id) => id.isEmpty);
     final sharedList = sharedToInstall.toList()..sort();
+    
+    // Show what will be installed
+    logger.section('Installing core shared modules');
+    var totalFiles = 0;
+    for (final sharedId in sharedList) {
+      final shared = registry.shared.firstWhere(
+        (s) => s.id == sharedId,
+        orElse: () => throw Exception('Shared module $sharedId not found'),
+      );
+      logger.detail('  • $sharedId (${shared.files.length} files)');
+      totalFiles += shared.files.length;
+    }
+    logger.detail('  Total: $totalFiles files');
+    print('');
+    
     for (final sharedId in sharedList) {
       await installShared(sharedId);
     }
@@ -152,10 +178,8 @@ class Installer {
         await installShared(sharedId);
       }
 
-      // 3. Install component files
-      for (final file in component.files) {
-        await _installComponentFile(component, file, component.files);
-      }
+      // 3. Install component files (bounded concurrency)
+      await _installComponentFiles(component);
 
       // 3b. Apply platform instructions (if any)
       await _applyPlatformInstructions(component);
@@ -235,6 +259,7 @@ class Installer {
     List<String> componentIds, {
     bool includeDependencies = true,
   }) async {
+    await _ensureConfigLoaded();
     final requested = componentIds.toList();
     final missing = <String>[];
     final resolved = <String, Component>{};
@@ -279,6 +304,8 @@ class Installer {
     final postInstall = <String>{};
     final fileDependencies = <String>{};
     final platformChanges = <String, Set<String>>{};
+    final componentFiles = <String, List<Map<String, String>>>{};
+    final manifestPreview = <String, Map<String, dynamic>>{};
 
     for (final component in resolved.values) {
       for (final sharedId in component.shared) {
@@ -332,6 +359,26 @@ class Installer {
               .addAll(sections);
         }
       });
+
+      final fileEntries = <Map<String, String>>[];
+      for (final file in component.files) {
+        final destination = _resolveComponentDestination(component, file);
+        fileEntries.add({
+          'source': file.source,
+          'destination': destination,
+        });
+      }
+      componentFiles[component.id] = fileEntries;
+      manifestPreview[component.id] = {
+        'id': component.id,
+        'name': component.name,
+        'version': component.version,
+        'tags': component.tags,
+        'shared': component.shared.toList()..sort(),
+        'dependsOn': component.dependsOn.toList()..sort(),
+        'files': component.files.map((f) => f.source).toList()..sort(),
+        'registryRoot': registry.registryRoot.root,
+      };
     }
 
     final components = resolved.values.toList()
@@ -350,6 +397,8 @@ class Installer {
       postInstall: postInstall.toList()..sort(),
       fileDependencies: fileDependencies.toList()..sort(),
       platformChanges: platformChanges,
+      componentFiles: componentFiles,
+      manifestPreview: manifestPreview,
     );
   }
 
@@ -413,6 +462,30 @@ class Installer {
     }
 
     section('File dependencies', plan.fileDependencies);
+
+    if (plan.componentFiles.isNotEmpty) {
+      final fileLines = <String>[];
+      final ids = plan.componentFiles.keys.toList()..sort();
+      for (final id in ids) {
+        final entries = plan.componentFiles[id] ?? const [];
+        for (final entry in entries) {
+          fileLines.add('$id: ${entry['source']} -> ${entry['destination']}');
+        }
+      }
+      section('File destinations', fileLines);
+    }
+
+    if (plan.manifestPreview.isNotEmpty) {
+      final previewLines = <String>[];
+      final ids = plan.manifestPreview.keys.toList()..sort();
+      for (final id in ids) {
+        final entry = plan.manifestPreview[id] ?? const {};
+        final version = entry['version'] ?? 'unknown';
+        final tags = (entry['tags'] as List?)?.join(', ') ?? '';
+        previewLines.add('$id: version=$version tags=[$tags]');
+      }
+      section('Manifest preview', previewLines);
+    }
 
     if (plan.platformChanges.isNotEmpty) {
       final platformLines = <String>[];
@@ -1035,6 +1108,28 @@ class Installer {
       dependsOn: file.dependsOn,
     );
     await _installFile(patched);
+  }
+
+  Future<void> _installComponentFiles(Component component) async {
+    final files = component.files;
+    if (files.isEmpty) {
+      return;
+    }
+    var index = 0;
+    Future<void> worker() async {
+      while (true) {
+        if (index >= files.length) {
+          return;
+        }
+        final file = files[index++];
+        await _installComponentFile(component, file, files);
+      }
+    }
+
+    final workerCount = _fileCopyConcurrency.clamp(1, files.length);
+    await Future.wait(
+      List.generate(workerCount, (_) => worker()),
+    );
   }
 
   Future<void> _installFileWithDependencies(
@@ -2163,6 +2258,38 @@ class Installer {
     return input.startsWith('y');
   }
 
+  void _printInitSummary(ShadcnConfig config, String? themePreset) {
+    logger.section('Init summary');
+    logger.info('  installPath: ${config.installPath ?? _defaultInstallPath}');
+    logger.info('  sharedPath: ${config.sharedPath ?? _defaultSharedPath}');
+    logger.info(
+        '  includeReadme: ${config.includeReadme ?? false ? 'yes' : 'no'}');
+    logger.info('  includeMeta: ${config.includeMeta ?? true ? 'yes' : 'no'}');
+    logger.info(
+        '  includePreview: ${config.includePreview ?? false ? 'yes' : 'no'}');
+    if (config.classPrefix != null && config.classPrefix!.isNotEmpty) {
+      logger.info('  classPrefix: ${config.classPrefix}');
+    }
+    if (config.pathAliases != null && config.pathAliases!.isNotEmpty) {
+      logger.info('  pathAliases: ${_formatAliases(config.pathAliases!)}');
+    }
+    if (themePreset != null && themePreset.isNotEmpty) {
+      logger.info('  themePreset: $themePreset');
+    }
+    logger.info(
+        '  shared core: theme, util, color_extensions, form_control, form_value_supplier');
+    logger.info('  dependencies: data_widget, gap');
+  }
+
+  bool _confirmInitProceed() {
+    stdout.write('Proceed with initialization? [Y/n]: ');
+    final input = stdin.readLineSync()?.trim().toLowerCase();
+    if (input == null || input.isEmpty) {
+      return true;
+    }
+    return input.startsWith('y');
+  }
+
   String get _defaultInstallPath {
     return registry.defaults['installPath'] ?? 'lib/ui/shadcn';
   }
@@ -2584,6 +2711,8 @@ class DryRunPlan {
   final List<String> postInstall;
   final List<String> fileDependencies;
   final Map<String, Set<String>> platformChanges;
+  final Map<String, List<Map<String, String>>> componentFiles;
+  final Map<String, Map<String, dynamic>> manifestPreview;
 
   DryRunPlan({
     required this.requested,
@@ -2597,6 +2726,8 @@ class DryRunPlan {
     required this.postInstall,
     required this.fileDependencies,
     required this.platformChanges,
+    required this.componentFiles,
+    required this.manifestPreview,
   });
 
   Map<String, dynamic> toJson() {
@@ -2625,6 +2756,8 @@ class DryRunPlan {
       'platformChanges': platformChanges.map(
         (key, value) => MapEntry(key, value.toList()..sort()),
       ),
+      'componentFiles': componentFiles,
+      'manifestPreview': manifestPreview,
     };
   }
 }

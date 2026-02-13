@@ -17,12 +17,25 @@ class Registry {
     required RegistryLocation sourceRoot,
     String? schemaPath,
     String? cachePath,
+    bool offline = false,
     CliLogger? logger,
   }) async {
-    final content = await registryRoot.readString('components.json');
+    String content;
+    if (offline && registryRoot.isRemote) {
+      if (cachePath == null) {
+        throw Exception('Offline mode: cache path not available.');
+      }
+      final cacheFile = File(cachePath);
+      if (!await cacheFile.exists()) {
+        throw Exception('Offline mode: cached components.json not found.');
+      }
+      content = await cacheFile.readAsString();
+    } else {
+      content = await registryRoot.readString('components.json');
+    }
     final data = jsonDecode(content);
 
-    if (cachePath != null && registryRoot.isRemote) {
+    if (!offline && cachePath != null && registryRoot.isRemote) {
       try {
         final cacheFile = File(cachePath);
         if (!await cacheFile.parent.exists()) {
@@ -59,13 +72,19 @@ class Registry {
   }
 
   List<SharedItem> get shared {
-    return (data['shared'] as List).map((e) => SharedItem.fromJson(e)).toList();
+    final raw = data['shared'];
+    if (raw is! List) {
+      return [];
+    }
+    return raw.map((e) => SharedItem.fromJson(e)).toList();
   }
 
   List<Component> get components {
-    return (data['components'] as List)
-        .map((e) => Component.fromJson(e))
-        .toList();
+    final raw = data['components'];
+    if (raw is! List) {
+      return [];
+    }
+    return raw.map((e) => Component.fromJson(e)).toList();
   }
 
   Component? getComponent(String name) {
@@ -508,18 +527,22 @@ class ComponentsSchemaValidator {
 class RegistryLocation {
   final String root;
   final bool isRemote;
+  final bool offline;
   final http.Client _client;
 
-  RegistryLocation.local(this.root)
+  RegistryLocation.local(this.root, {this.offline = false})
       : isRemote = false,
         _client = http.Client();
 
-  RegistryLocation.remote(this.root)
+  RegistryLocation.remote(this.root, {this.offline = false})
       : isRemote = true,
         _client = http.Client();
 
   Future<List<int>> readBytes(String relativePath) async {
     if (isRemote) {
+      if (offline) {
+        throw Exception('Offline mode: remote access disabled.');
+      }
       final uri = _resolveRemote(relativePath);
       final response = await _client.get(uri);
       if (response.statusCode < 200 || response.statusCode >= 300) {

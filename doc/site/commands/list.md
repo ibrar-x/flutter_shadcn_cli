@@ -14,6 +14,10 @@ flutter_shadcn list [--refresh] [--json]
 - `--refresh`: Refresh cache from remote.
 - `--json`: Output machine-readable JSON (pretty-printed).
 
+## Global Flags
+
+- `--offline`: Disable network calls and use cached registry/index data only.
+
 ## Alias
 
 - `ls`

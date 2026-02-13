@@ -2,13 +2,15 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_shadcn_cli/src/logger.dart';
+import 'package:flutter_shadcn_cli/src/exit_codes.dart';
 import 'package:path/path.dart' as p;
 
 /// Manages CLI version checking and upgrades
 class VersionManager {
   static const String currentVersion = '0.1.8';
   static const String packageName = 'flutter_shadcn_cli';
-  static const String pubDevApiUrl = 'https://pub.dev/api/packages/$packageName';
+  static const String pubDevApiUrl =
+      'https://pub.dev/api/packages/$packageName';
   static const Duration checkInterval = Duration(hours: 24);
 
   final CliLogger logger;
@@ -32,7 +34,7 @@ class VersionManager {
         final cacheContent = await cacheFile.readAsString();
         final cacheData = json.decode(cacheContent) as Map<String, dynamic>;
         final lastCheck = DateTime.parse(cacheData['lastCheck'] as String);
-        
+
         // If we checked within the last 24 hours, skip
         if (now.difference(lastCheck) < checkInterval) {
           // Show cached notification if there was an update available
@@ -46,7 +48,7 @@ class VersionManager {
 
       // Fetch latest version
       final latestVersion = await _fetchLatestVersion();
-      
+
       if (latestVersion == null) {
         // Unable to check - save timestamp anyway to avoid hammering the API
         await _saveCacheData(now, false, currentVersion);
@@ -55,7 +57,7 @@ class VersionManager {
 
       // Check if there's an update
       final hasUpdate = _isNewerVersion(latestVersion, currentVersion);
-      
+
       // Save to cache
       await _saveCacheData(now, hasUpdate, latestVersion);
 
@@ -74,22 +76,31 @@ class VersionManager {
     try {
       logger.info('Checking for updates...');
       final latestVersion = await _fetchLatestVersion();
-      
+
       if (latestVersion == null) {
-        logger.warn('Unable to check for updates. Please check your internet connection.');
+        logger.warn(
+            'Unable to check for updates. Please check your internet connection.');
         return;
       }
 
       if (_isNewerVersion(latestVersion, currentVersion)) {
         logger.warn('');
-        logger.warn('┌────────────────────────────────────────────────────────┐');
-        logger.warn('│  A new version of flutter_shadcn_cli is available!    │');
-        logger.warn('│                                                        │');
-        logger.warn('│  Current: $currentVersion                                    │');
-        logger.warn('│  Latest:  $latestVersion                                    │');
-        logger.warn('│                                                        │');
-        logger.warn('│  Run: flutter_shadcn upgrade                           │');
-        logger.warn('└────────────────────────────────────────────────────────┘');
+        logger
+            .warn('┌────────────────────────────────────────────────────────┐');
+        logger
+            .warn('│  A new version of flutter_shadcn_cli is available!    │');
+        logger
+            .warn('│                                                        │');
+        logger.warn(
+            '│  Current: $currentVersion                                    │');
+        logger.warn(
+            '│  Latest:  $latestVersion                                    │');
+        logger
+            .warn('│                                                        │');
+        logger
+            .warn('│  Run: flutter_shadcn upgrade                           │');
+        logger
+            .warn('└────────────────────────────────────────────────────────┘');
         logger.warn('');
       } else {
         logger.success('You are using the latest version ($currentVersion)');
@@ -104,10 +115,11 @@ class VersionManager {
     try {
       logger.info('Checking for updates...');
       final latestVersion = await _fetchLatestVersion();
-      
+
       if (latestVersion == null) {
-        logger.error('Unable to fetch latest version. Please check your internet connection.');
-        exit(1);
+        logger.error(
+            'Unable to fetch latest version. Please check your internet connection.');
+        exit(ExitCodes.networkError);
       }
 
       if (!force && !_isNewerVersion(latestVersion, currentVersion)) {
@@ -138,14 +150,14 @@ class VersionManager {
         logger.error('');
         logger.info('Try manually upgrading with:');
         logger.info('  dart pub global activate $packageName');
-        exit(1);
+        exit(ExitCodes.ioError);
       }
     } catch (e) {
       logger.error('Error during upgrade: $e');
       logger.info('');
       logger.info('Try manually upgrading with:');
       logger.info('  dart pub global activate $packageName');
-      exit(1);
+      exit(ExitCodes.ioError);
     }
   }
 
@@ -153,8 +165,8 @@ class VersionManager {
   Future<String?> _fetchLatestVersion() async {
     try {
       final response = await http.get(Uri.parse(pubDevApiUrl)).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -182,17 +194,23 @@ class VersionManager {
   /// Shows a subtle update notification
   void _showUpdateNotification(String latestVersion) {
     stderr.writeln('');
-    stderr.writeln('┌─────────────────────────────────────────────────────────┐');
-    stderr.writeln('│ A new version of flutter_shadcn_cli is available!      │');
-    stderr.writeln('│ Current: $currentVersion → Latest: $latestVersion                       │');
-    stderr.writeln('│ Run: flutter_shadcn upgrade                             │');
-    stderr.writeln('└─────────────────────────────────────────────────────────┘');
+    stderr
+        .writeln('┌─────────────────────────────────────────────────────────┐');
+    stderr
+        .writeln('│ A new version of flutter_shadcn_cli is available!      │');
+    stderr.writeln(
+        '│ Current: $currentVersion → Latest: $latestVersion                       │');
+    stderr
+        .writeln('│ Run: flutter_shadcn upgrade                             │');
+    stderr
+        .writeln('└─────────────────────────────────────────────────────────┘');
     stderr.writeln('');
   }
 
   /// Gets the version cache file path
   File _versionCacheFile() {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
     if (home == null) {
       throw Exception('Unable to determine home directory');
     }
@@ -204,7 +222,8 @@ class VersionManager {
   }
 
   /// Saves version check data to cache
-  Future<void> _saveCacheData(DateTime timestamp, bool hasUpdate, String latestVersion) async {
+  Future<void> _saveCacheData(
+      DateTime timestamp, bool hasUpdate, String latestVersion) async {
     final cacheFile = _versionCacheFile();
     final data = {
       'lastCheck': timestamp.toIso8601String(),

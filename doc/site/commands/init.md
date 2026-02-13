@@ -24,6 +24,7 @@ flutter_shadcn init [options] [components...]
 ## Behavior Details
 
 - Prompts for install/shared paths unless `--yes` or overrides are supplied
+- Shows a summary and asks for confirmation unless `--yes` is used
 - Installs core shared helpers (theme, util, color_extensions, form_control, form_value_supplier)
 - Adds core dependencies (data_widget, gap)
 - Applies a theme preset if selected

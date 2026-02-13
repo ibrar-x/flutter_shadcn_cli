@@ -9,9 +9,21 @@ Run diagnostics for registry resolution and schema validation.
 flutter_shadcn doctor [--json]
 ```
 
+## Checks
+
+- Registry resolution (local/remote)
+- Schema validation status
+- Config path validity (install/shared)
+- Missing `color_scheme.dart`
+- Alias path validity
+
 ## Options
 
 - `--json`: Output machine-readable JSON (pretty-printed).
+
+## Global Flags
+
+- `--offline`: Disable network calls and use cached registry data only.
 
 ## JSON Output
 

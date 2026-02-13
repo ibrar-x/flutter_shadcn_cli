@@ -9,9 +9,15 @@ import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/registry.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/discovery_commands.dart';
+import 'package:flutter_shadcn_cli/src/exit_codes.dart';
+import 'package:flutter_shadcn_cli/src/json_output.dart';
 import 'package:flutter_shadcn_cli/src/skill_manager.dart';
 import 'package:flutter_shadcn_cli/src/version_manager.dart';
 import 'package:flutter_shadcn_cli/src/feedback_manager.dart';
+import 'package:flutter_shadcn_cli/src/validate_command.dart';
+import 'package:flutter_shadcn_cli/src/audit_command.dart';
+import 'package:flutter_shadcn_cli/src/deps_command.dart';
+import 'package:flutter_shadcn_cli/src/docs_generator.dart';
 
 Future<void> main(List<String> arguments) async {
   _ensureExecutablePath();
@@ -21,6 +27,9 @@ Future<void> main(List<String> arguments) async {
     ..addFlag('wip', negatable: false, help: 'Enable WIP features')
     ..addFlag('experimental',
         negatable: false, help: 'Enable experimental features')
+    ..addFlag('offline',
+        negatable: false,
+        help: 'Disable network calls and use cached registry data only')
     ..addFlag('dev',
         negatable: false, help: 'Persist local registry for dev mode')
     ..addOption('dev-path', help: 'Local registry path to persist for dev mode')
@@ -95,6 +104,40 @@ Future<void> main(List<String> arguments) async {
       ArgParser()
         ..addFlag('json',
             negatable: false, help: 'Output machine-readable JSON')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'validate',
+      ArgParser()
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'audit',
+      ArgParser()
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'deps',
+      ArgParser()
+        ..addFlag('all',
+            abbr: 'a',
+            negatable: false,
+            help: 'Compare dependencies for all registry components')
+        ..addFlag('json',
+            negatable: false, help: 'Output machine-readable JSON')
+        ..addFlag('help', abbr: 'h', negatable: false),
+    )
+    ..addCommand(
+      'docs',
+      ArgParser()
+        ..addFlag('generate',
+            abbr: 'g',
+            negatable: false,
+            help: 'Regenerate /doc/site documentation')
         ..addFlag('help', abbr: 'h', negatable: false),
     )
     ..addCommand(
@@ -206,7 +249,7 @@ Future<void> main(List<String> arguments) async {
     argResults = parser.parse(normalizedArgs);
   } catch (e) {
     print('Error: $e');
-    exit(1);
+    exit(ExitCodes.usage);
   }
 
   if (argResults['help'] == true) {
@@ -216,12 +259,13 @@ Future<void> main(List<String> arguments) async {
 
   if (argResults.command == null) {
     _printUsage();
-    exit(1);
+    exit(ExitCodes.usage);
   }
 
   final targetDir = Directory.current.path;
   final roots = await _resolveRoots();
   final verbose = argResults['verbose'] == true;
+  final offline = argResults['offline'] == true;
   final logger = CliLogger(verbose: verbose);
   var config = await ShadcnConfig.load(targetDir);
 
@@ -230,6 +274,7 @@ Future<void> main(List<String> arguments) async {
   final shouldCheckUpdates = config.checkUpdates ?? true;
   final commandName = argResults.command?.name;
   if (shouldCheckUpdates &&
+      !offline &&
       commandName != 'version' &&
       commandName != 'upgrade') {
     final versionMgr = VersionManager(logger: logger);
@@ -246,7 +291,7 @@ Future<void> main(List<String> arguments) async {
     if (resolvedDevPath == null) {
       stderr.writeln('Error: Unable to resolve local registry for dev mode.');
       stderr.writeln('Set SHADCN_REGISTRY_ROOT or --dev-path.');
-      exit(1);
+      exit(ExitCodes.registryNotFound);
     }
     config = config.copyWith(
       registryMode: 'local',
@@ -268,6 +313,25 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
+  if (argResults.command!.name == 'docs') {
+    final docsCommand = argResults.command!;
+    if (docsCommand['help'] == true) {
+      print('Usage: flutter_shadcn docs [--generate]');
+      print('');
+      print('Regenerate /doc/site documentation from sources.');
+      print('Options:');
+      print('  --generate, -g  Regenerate documentation (default)');
+      return;
+    }
+    final cliRoot = roots.cliRoot ?? await _packageRoot();
+    if (cliRoot == null) {
+      stderr.writeln('Error: Unable to resolve CLI root.');
+      exit(ExitCodes.ioError);
+    }
+    await generateDocsSite(cliRoot: cliRoot, logger: logger);
+    return;
+  }
+
   final needsRegistry = const {
     'init',
     'theme',
@@ -276,10 +340,14 @@ Future<void> main(List<String> arguments) async {
     'remove',
     'sync',
     'assets',
+    'validate',
+    'audit',
+    'deps',
   };
   Registry? registry;
   if (needsRegistry.contains(argResults.command!.name)) {
-    final selection = _resolveRegistrySelection(argResults, roots, config);
+    final selection =
+        _resolveRegistrySelection(argResults, roots, config, offline);
     final schemaPath = null;
     final cachePath = _componentsJsonCachePath(selection.registryRoot);
     try {
@@ -288,12 +356,20 @@ Future<void> main(List<String> arguments) async {
         sourceRoot: selection.sourceRoot,
         schemaPath: schemaPath,
         cachePath: cachePath,
+        offline: offline,
         logger: logger,
       );
     } catch (e) {
       stderr.writeln('Error loading registry: $e');
       stderr.writeln('Registry root: ${selection.registryRoot.root}');
-      exit(1);
+      final message = e.toString();
+      if (message.contains('Offline mode')) {
+        exit(ExitCodes.offlineUnavailable);
+      }
+      if (message.contains('Failed to fetch')) {
+        exit(ExitCodes.networkError);
+      }
+      exit(ExitCodes.registryNotFound);
     }
   }
 
@@ -311,7 +387,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (initCommand['help'] == true) {
         print('Usage: flutter_shadcn init [options]');
@@ -410,7 +486,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (themeCommand['help'] == true) {
         print(
@@ -438,7 +514,7 @@ Future<void> main(List<String> arguments) async {
         if (!isExperimental) {
           stderr.writeln(
               'Error: --apply-file/--apply-url require --experimental.');
-          exit(1);
+          exit(ExitCodes.usage);
         }
         if (applyFile != null) {
           await activeInstaller.applyThemeFromFile(applyFile);
@@ -463,7 +539,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (addCommand['help'] == true) {
         print('Usage: flutter_shadcn add <component> [<component> ...]');
@@ -487,7 +563,7 @@ Future<void> main(List<String> arguments) async {
       if (rest.isEmpty) {
         print('Usage: flutter_shadcn add <component>');
         print('       flutter_shadcn add --all');
-        exit(1);
+        exit(ExitCodes.usage);
       }
       await activeInstaller.ensureInitFiles(allowPrompts: false);
       await activeInstaller.runBulkInstall(() async {
@@ -501,7 +577,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (dryRunCommand['help'] == true) {
         print(
@@ -528,19 +604,37 @@ Future<void> main(List<String> arguments) async {
         if (rest.isEmpty) {
           print('Usage: flutter_shadcn dry-run <component> [<component> ...]');
           print('       flutter_shadcn dry-run --all');
-          exit(1);
+          exit(ExitCodes.usage);
         }
         componentIds.addAll(rest);
       }
       final plan = await activeInstaller.buildDryRunPlan(componentIds);
+      final hasMissing = plan.missing.isNotEmpty;
+      final dryRunExitCode =
+          hasMissing ? ExitCodes.componentMissing : ExitCodes.success;
       if (dryRunCommand['json'] == true) {
-        final payload = <String, dynamic>{
-          'command': 'dry-run',
-          ...plan.toJson(),
-        };
-        print(const JsonEncoder.withIndent('  ').convert(payload));
+        final warnings = <Map<String, dynamic>>[];
+        if (hasMissing) {
+          warnings.add(jsonWarning(
+            code: ExitCodeLabels.componentMissing,
+            message: 'One or more components were not found.',
+            details: {'missing': plan.missing},
+          ));
+        }
+        final payload = jsonEnvelope(
+          command: 'dry-run',
+          data: plan.toJson(),
+          warnings: warnings,
+          meta: {
+            'exitCode': dryRunExitCode,
+          },
+        );
+        printJson(payload);
       } else {
         activeInstaller.printDryRunPlan(plan);
+      }
+      if (dryRunExitCode != ExitCodes.success) {
+        exitCode = dryRunExitCode;
       }
       break;
     case 'remove':
@@ -548,7 +642,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (removeCommand['help'] == true) {
         print('Usage: flutter_shadcn remove <component> [<component> ...]');
@@ -567,7 +661,7 @@ Future<void> main(List<String> arguments) async {
       }
       if (rest.isEmpty) {
         print('Usage: flutter_shadcn remove <component>');
-        exit(1);
+        exit(ExitCodes.usage);
       }
       final force = removeCommand['force'] == true;
       for (final componentName in rest) {
@@ -587,12 +681,90 @@ Future<void> main(List<String> arguments) async {
         exit(0);
       }
       break;
+    case 'validate':
+      final validateCommand = argResults.command!;
+      if (validateCommand['help'] == true) {
+        print('Usage: flutter_shadcn validate [--json]');
+        print('');
+        print('Validates components.json and registry file dependencies.');
+        print('Options:');
+        print('  --json             Output machine-readable JSON');
+        exit(0);
+      }
+      if (registry == null) {
+        stderr.writeln('Error: Registry is not available.');
+        exit(ExitCodes.registryNotFound);
+      }
+      final validateExit = await runValidateCommand(
+        registry: registry,
+        registryRoot: registry.registryRoot,
+        sourceRoot: registry.sourceRoot,
+        offline: offline,
+        jsonOutput: validateCommand['json'] == true,
+        logger: logger,
+      );
+      if (validateExit != ExitCodes.success) {
+        exitCode = validateExit;
+      }
+      break;
+    case 'audit':
+      final auditCommand = argResults.command!;
+      if (auditCommand['help'] == true) {
+        print('Usage: flutter_shadcn audit [--json]');
+        print('');
+        print('Audits installed components against registry metadata.');
+        print('Options:');
+        print('  --json             Output machine-readable JSON');
+        exit(0);
+      }
+      if (registry == null) {
+        stderr.writeln('Error: Registry is not available.');
+        exit(ExitCodes.registryNotFound);
+      }
+      final auditExit = await runAuditCommand(
+        registry: registry,
+        targetDir: targetDir,
+        config: config,
+        jsonOutput: auditCommand['json'] == true,
+        logger: logger,
+      );
+      if (auditExit != ExitCodes.success) {
+        exitCode = auditExit;
+      }
+      break;
+    case 'deps':
+      final depsCommand = argResults.command!;
+      if (depsCommand['help'] == true) {
+        print('Usage: flutter_shadcn deps [--all] [--json]');
+        print('');
+        print('Compares registry dependency versions to pubspec.yaml.');
+        print('Options:');
+        print('  --all, -a          Compare all registry components');
+        print('  --json             Output machine-readable JSON');
+        exit(0);
+      }
+      if (registry == null) {
+        stderr.writeln('Error: Registry is not available.');
+        exit(ExitCodes.registryNotFound);
+      }
+      final depsExit = await runDepsCommand(
+        registry: registry,
+        targetDir: targetDir,
+        config: config,
+        includeAll: depsCommand['all'] == true,
+        jsonOutput: depsCommand['json'] == true,
+        logger: logger,
+      );
+      if (depsExit != ExitCodes.success) {
+        exitCode = depsExit;
+      }
+      break;
     case 'assets':
       final assetsCommand = argResults.command!;
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (assetsCommand['help'] == true) {
         print('Usage: flutter_shadcn assets [options]');
@@ -622,7 +794,7 @@ Future<void> main(List<String> arguments) async {
           assetsCommand['typography'] == true || assetsCommand['fonts'] == true;
       if (!installAll && !installIcons && !installTypography) {
         print('Nothing selected. Use --icons, --typography, or --all.');
-        exit(1);
+        exit(ExitCodes.usage);
       }
 
       await activeInstaller.runBulkInstall(() async {
@@ -654,7 +826,7 @@ Future<void> main(List<String> arguments) async {
       final list = platformCommand['list'] == true;
       if (sets.isEmpty && resets.isEmpty && !list) {
         print('Nothing selected. Use --list, --set, or --reset.');
-        exit(1);
+        exit(ExitCodes.usage);
       }
 
       final updated = _updatePlatformTargets(config, sets, resets);
@@ -670,7 +842,7 @@ Future<void> main(List<String> arguments) async {
       final activeInstaller = installer;
       if (activeInstaller == null) {
         stderr.writeln('Error: Installer is not available.');
-        exit(1);
+        exit(ExitCodes.registryNotFound);
       }
       if (syncCommand['help'] == true) {
         print('Usage: flutter_shadcn sync');
@@ -692,15 +864,20 @@ Future<void> main(List<String> arguments) async {
         print('  --json     Output machine-readable JSON');
         exit(0);
       }
-      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final selection =
+          _resolveRegistrySelection(argResults, roots, config, offline);
       final registryUrl = selection.registryRoot.root;
-      await handleListCommand(
+      final listExit = await handleListCommand(
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: listCommand['refresh'] == true,
+        offline: offline,
         jsonOutput: listCommand['json'] == true,
         logger: logger,
       );
+      if (listExit != ExitCodes.success) {
+        exitCode = listExit;
+      }
       break;
     case 'search':
       final searchCommand = argResults.command!;
@@ -716,18 +893,23 @@ Future<void> main(List<String> arguments) async {
       final searchQuery = searchCommand.rest.join(' ');
       if (searchQuery.isEmpty) {
         print('Usage: flutter_shadcn search <query>');
-        exit(1);
+        exit(ExitCodes.usage);
       }
-      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final selection =
+          _resolveRegistrySelection(argResults, roots, config, offline);
       final registryUrl = selection.registryRoot.root;
-      await handleSearchCommand(
+      final searchExit = await handleSearchCommand(
         query: searchQuery,
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: searchCommand['refresh'] == true,
+        offline: offline,
         jsonOutput: searchCommand['json'] == true,
         logger: logger,
       );
+      if (searchExit != ExitCodes.success) {
+        exitCode = searchExit;
+      }
       break;
     case 'info':
       final infoCommand = argResults.command!;
@@ -744,18 +926,23 @@ Future<void> main(List<String> arguments) async {
           infoCommand.rest.isNotEmpty ? infoCommand.rest.first : '';
       if (componentId.isEmpty) {
         print('Usage: flutter_shadcn info <component-id>');
-        exit(1);
+        exit(ExitCodes.usage);
       }
-      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final selection =
+          _resolveRegistrySelection(argResults, roots, config, offline);
       final registryUrl = selection.registryRoot.root;
-      await handleInfoCommand(
+      final infoExit = await handleInfoCommand(
         componentId: componentId,
         registryBaseUrl: registryUrl,
         registryId: _sanitizeCacheKey(registryUrl),
         refresh: infoCommand['refresh'] == true,
+        offline: offline,
         jsonOutput: infoCommand['json'] == true,
         logger: logger,
       );
+      if (infoExit != ExitCodes.success) {
+        exitCode = infoExit;
+      }
       break;
     case 'install-skill':
       final skillCommand = argResults.command!;
@@ -824,7 +1011,8 @@ Future<void> main(List<String> arguments) async {
       }
 
       // Resolve skills base path (project root for discovering model folders)
-      final selection = _resolveRegistrySelection(argResults, roots, config);
+      final selection =
+          _resolveRegistrySelection(argResults, roots, config, offline);
       final skillsOverride = skillCommand['skills-url'] as String?;
       final defaultSkillsUrl = skillsOverride?.isNotEmpty == true
           ? skillsOverride!
@@ -853,7 +1041,7 @@ Future<void> main(List<String> arguments) async {
         if (model == null) {
           logger.error(
               '--uninstall requires --model, or use --uninstall-interactive for menu');
-          exit(1);
+          exit(ExitCodes.usage);
         }
         await skillMgr.uninstallSkill(skillId: skillId, model: model);
       } else if (skillCommand['symlink'] == true) {
@@ -865,14 +1053,14 @@ Future<void> main(List<String> arguments) async {
             : null;
         if (skillId == null || targetModel == null) {
           logger.error('--symlink requires both --skill and --model');
-          exit(1);
+          exit(ExitCodes.usage);
         }
         // Ask for destination models
         final allModels = skillMgr.discoverModelFolders();
         final available = allModels.where((m) => m != targetModel).toList();
         if (available.isEmpty) {
           logger.error('No other models available to symlink to.');
-          exit(1);
+          exit(ExitCodes.usage);
         }
         logger.section('🔗 Create symlinks for skill: $skillId');
         print('\nAvailable target models:');
@@ -1025,6 +1213,10 @@ void _printUsage() {
   print('  list           List available components (alias: ls)');
   print('  search         Search for components');
   print('  info           Show component details (alias: i)');
+  print('  validate       Validate registry integrity');
+  print('  audit          Audit installed components');
+  print('  deps           Compare registry deps vs pubspec');
+  print('  docs           Regenerate documentation site');
   print('  install-skill  Install AI skills (🧪 experimental)');
   print('  version        Show CLI version');
   print('  upgrade        Upgrade CLI to latest version');
@@ -1038,6 +1230,7 @@ void _printUsage() {
   print('  --registry       auto|local|remote (default: auto)');
   print('  --registry-path  Path to local registry folder');
   print('  --registry-url   Remote registry base URL');
+  print('  --offline        Disable network calls (use cache only)');
   print('  --wip            Enable WIP features');
   print('  --experimental   Enable experimental features');
 }
@@ -1221,9 +1414,10 @@ Future<void> _runDoctor(
   ArgResults args,
   ShadcnConfig config,
 ) async {
+  final offline = args['offline'] == true;
   final jsonOutput = args.command?['json'] == true;
   final logger = CliLogger(verbose: args['verbose'] == true);
-  final selection = _resolveRegistrySelection(args, roots, config);
+  final selection = _resolveRegistrySelection(args, roots, config, offline);
   final envRoot = Platform.environment['SHADCN_REGISTRY_ROOT'];
   final envUrl = Platform.environment['SHADCN_REGISTRY_URL'];
   final pubCache = Platform.environment['PUB_CACHE'] ??
@@ -1235,7 +1429,7 @@ Future<void> _runDoctor(
   bool? schemaValid;
   final schemaErrors = <String>[];
   try {
-    final content = await selection.registryRoot.readString('components.json');
+    final content = await _readComponentsJson(selection, offline: offline);
     final decoded = jsonDecode(content);
     if (decoded is Map<String, dynamic>) {
       registryData = decoded;
@@ -1244,9 +1438,41 @@ Future<void> _runDoctor(
         registryRoot: selection.registryRoot,
       );
     }
-  } catch (_) {
-    registryData = null;
-    schemaSource = null;
+  } catch (e) {
+    final message = e.toString();
+    final exit = message.contains('Offline mode')
+        ? ExitCodes.offlineUnavailable
+        : ExitCodes.networkError;
+    if (jsonOutput) {
+      final payload = jsonEnvelope(
+        command: 'doctor',
+        data: {
+          'registry': {
+            'mode': selection.mode,
+            'root': selection.registryRoot.root,
+            'componentsJson': componentsSource,
+            'cache': cachePath ?? '(local registry, no cache)',
+          },
+        },
+        errors: [
+          jsonError(
+            code: message.contains('Offline mode')
+                ? ExitCodeLabels.offlineUnavailable
+                : ExitCodeLabels.networkError,
+            message: message,
+          ),
+        ],
+        meta: {
+          'exitCode': exit,
+        },
+      );
+      printJson(payload);
+      exitCode = exit;
+      return;
+    }
+    logger.error('Failed to load components.json: $message');
+    exitCode = exit;
+    return;
   }
 
   if (schemaSource != null && registryData != null) {
@@ -1263,41 +1489,169 @@ Future<void> _runDoctor(
     }
   }
 
+  final defaults = (registryData?['defaults'] as Map?)
+          ?.map((key, value) => MapEntry(key.toString(), value.toString())) ??
+      const <String, String>{};
+  final installPath =
+      config.installPath ?? defaults['installPath'] ?? 'lib/ui/shadcn';
+  final sharedPath =
+      config.sharedPath ?? defaults['sharedPath'] ?? 'lib/ui/shadcn/shared';
+  final aliases = config.pathAliases ?? const <String, String>{};
+  final resolvedInstallPath = _expandAliasPath(installPath, aliases);
+  final resolvedSharedPath = _expandAliasPath(sharedPath, aliases);
+  final installPathOnDisk = _ensureLibPrefix(resolvedInstallPath);
+  final sharedPathOnDisk = _ensureLibPrefix(resolvedSharedPath);
+  final installPathValid = _isLibPath(resolvedInstallPath);
+  final sharedPathValid = _isLibPath(resolvedSharedPath);
+  final installPathExists =
+      Directory(p.join(Directory.current.path, installPathOnDisk)).existsSync();
+  final sharedPathExists =
+      Directory(p.join(Directory.current.path, sharedPathOnDisk)).existsSync();
+  final colorSchemePath = p.join(
+    Directory.current.path,
+    sharedPathOnDisk,
+    'theme',
+    'color_scheme.dart',
+  );
+  final colorSchemeExists = File(colorSchemePath).existsSync();
+  final invalidAliases = <String>[];
+  aliases.forEach((name, value) {
+    final aliasPath = p.join(Directory.current.path, _ensureLibPrefix(value));
+    if (!Directory(aliasPath).existsSync()) {
+      invalidAliases.add(name);
+    }
+  });
+
   final platformTargets = _mergePlatformTargets(config.platformTargets);
 
-  if (jsonOutput) {
-    final payload = <String, dynamic>{
-      'command': 'doctor',
-      'environment': {
-        'script': Platform.script.toFilePath(),
-        'cwd': Directory.current.path,
-        'pubCache': pubCache,
-      },
-      'registry': {
-        'mode': selection.mode,
-        'root': selection.registryRoot.root,
-        'componentsJson': componentsSource,
-        'cache': cachePath ?? '(local registry, no cache)',
-        'schema': schemaSource?.label,
-      },
-      'configuration': {
-        'SHADCN_REGISTRY_ROOT': envRoot,
-        'SHADCN_REGISTRY_URL': envUrl,
-        'cliRoot': roots.cliRoot,
-        'localRegistryRoot': roots.localRegistryRoot,
-        'config.registryMode': config.registryMode,
-        'config.registryPath': config.registryPath,
-        'config.registryUrl': config.registryUrl,
-      },
-      'schema': {
-        'found': schemaSource != null,
-        'valid': schemaValid,
+  final hasSchemaIssues = schemaValid == false;
+  final hasConfigIssues = !installPathValid ||
+      !sharedPathValid ||
+      !colorSchemeExists ||
+      invalidAliases.isNotEmpty;
+  final warnings = <Map<String, dynamic>>[];
+  final errors = <Map<String, dynamic>>[];
+
+  if (!installPathExists) {
+    warnings.add(jsonWarning(
+      code: ExitCodeLabels.configInvalid,
+      message: 'Install path does not exist.',
+      details: {'path': resolvedInstallPath},
+    ));
+  }
+  if (!sharedPathExists) {
+    warnings.add(jsonWarning(
+      code: ExitCodeLabels.configInvalid,
+      message: 'Shared path does not exist.',
+      details: {'path': resolvedSharedPath},
+    ));
+  }
+
+  if (hasSchemaIssues) {
+    errors.add(jsonError(
+      code: ExitCodeLabels.schemaInvalid,
+      message: 'Schema validation failed.',
+      details: {
         'errorCount': schemaErrors.length,
         'errors': schemaErrors,
       },
-      'platformTargets': platformTargets,
-    };
-    print(const JsonEncoder.withIndent('  ').convert(payload));
+    ));
+  }
+  if (!installPathValid) {
+    errors.add(jsonError(
+      code: ExitCodeLabels.configInvalid,
+      message: 'Install path is not under lib/.',
+      details: {'path': resolvedInstallPath},
+    ));
+  }
+  if (!sharedPathValid) {
+    errors.add(jsonError(
+      code: ExitCodeLabels.configInvalid,
+      message: 'Shared path is not under lib/.',
+      details: {'path': resolvedSharedPath},
+    ));
+  }
+  if (!colorSchemeExists) {
+    errors.add(jsonError(
+      code: ExitCodeLabels.configInvalid,
+      message: 'color_scheme.dart is missing.',
+      details: {'path': colorSchemePath},
+    ));
+  }
+  if (invalidAliases.isNotEmpty) {
+    errors.add(jsonError(
+      code: ExitCodeLabels.configInvalid,
+      message: 'One or more path aliases are invalid.',
+      details: {'aliases': invalidAliases},
+    ));
+  }
+
+  var doctorExitCode = ExitCodes.success;
+  if (hasSchemaIssues && hasConfigIssues) {
+    doctorExitCode = ExitCodes.validationFailed;
+  } else if (hasSchemaIssues) {
+    doctorExitCode = ExitCodes.schemaInvalid;
+  } else if (hasConfigIssues) {
+    doctorExitCode = ExitCodes.configInvalid;
+  }
+
+  if (jsonOutput) {
+    final payload = jsonEnvelope(
+      command: 'doctor',
+      data: {
+        'environment': {
+          'script': Platform.script.toFilePath(),
+          'cwd': Directory.current.path,
+          'pubCache': pubCache,
+        },
+        'registry': {
+          'mode': selection.mode,
+          'root': selection.registryRoot.root,
+          'componentsJson': componentsSource,
+          'cache': cachePath ?? '(local registry, no cache)',
+          'schema': schemaSource?.label,
+        },
+        'configuration': {
+          'SHADCN_REGISTRY_ROOT': envRoot,
+          'SHADCN_REGISTRY_URL': envUrl,
+          'cliRoot': roots.cliRoot,
+          'localRegistryRoot': roots.localRegistryRoot,
+          'config.registryMode': config.registryMode,
+          'config.registryPath': config.registryPath,
+          'config.registryUrl': config.registryUrl,
+        },
+        'paths': {
+          'installPath': installPath,
+          'sharedPath': sharedPath,
+          'resolvedInstallPath': resolvedInstallPath,
+          'resolvedSharedPath': resolvedSharedPath,
+          'installPathValid': installPathValid,
+          'sharedPathValid': sharedPathValid,
+          'installPathExists': installPathExists,
+          'sharedPathExists': sharedPathExists,
+          'colorSchemePath': colorSchemePath,
+          'colorSchemeExists': colorSchemeExists,
+        },
+        'aliases': {
+          'configured': aliases,
+          'invalid': invalidAliases,
+        },
+        'schema': {
+          'found': schemaSource != null,
+          'valid': schemaValid,
+          'errorCount': schemaErrors.length,
+          'errors': schemaErrors,
+        },
+        'platformTargets': platformTargets,
+      },
+      errors: errors,
+      warnings: warnings,
+      meta: {
+        'exitCode': doctorExitCode,
+      },
+    );
+    printJson(payload);
+    exitCode = doctorExitCode;
     return;
   }
 
@@ -1334,6 +1688,22 @@ Future<void> _runDoctor(
   kv('config.registryUrl', config.registryUrl ?? '(unset)');
 
   print('');
+  logger.section('Config paths');
+  kv('installPath', resolvedInstallPath);
+  kv('sharedPath', resolvedSharedPath);
+  logger.info('  installPath valid: ${installPathValid ? 'yes' : 'no'}');
+  logger.info('  sharedPath valid: ${sharedPathValid ? 'yes' : 'no'}');
+  logger.info('  installPath exists: ${installPathExists ? 'yes' : 'no'}');
+  logger.info('  sharedPath exists: ${sharedPathExists ? 'yes' : 'no'}');
+  if (invalidAliases.isNotEmpty) {
+    logger.warn('  invalid aliases: ${invalidAliases.join(', ')}');
+  }
+
+  print('');
+  logger.section('Theme files');
+  kv('color_scheme.dart', colorSchemeExists ? colorSchemePath : 'missing');
+
+  print('');
   logger.section('Schema validation');
   if (schemaSource == null || registryData == null) {
     logger.warn('  Schema file not found.');
@@ -1361,6 +1731,10 @@ Future<void> _runDoctor(
       logger.info('    ${entry.key}: ${entry.value}');
     }
   });
+
+  if (doctorExitCode != ExitCodes.success) {
+    exitCode = doctorExitCode;
+  }
 }
 
 String? _componentsJsonCachePath(RegistryLocation registryRoot) {
@@ -1374,6 +1748,24 @@ String? _componentsJsonCachePath(RegistryLocation registryRoot) {
   final cacheRoot = p.join(home, '.flutter_shadcn', 'cache', 'registry');
   final safeKey = _sanitizeCacheKey(registryRoot.root);
   return p.join(cacheRoot, safeKey, 'components.json');
+}
+
+Future<String> _readComponentsJson(
+  RegistrySelection selection, {
+  required bool offline,
+}) async {
+  if (offline && selection.registryRoot.isRemote) {
+    final cachePath = _componentsJsonCachePath(selection.registryRoot);
+    if (cachePath == null) {
+      throw Exception('Offline mode: cache path not available.');
+    }
+    final cacheFile = File(cachePath);
+    if (!await cacheFile.exists()) {
+      throw Exception('Offline mode: cached components.json not found.');
+    }
+    return cacheFile.readAsString();
+  }
+  return selection.registryRoot.readString('components.json');
 }
 
 String _sanitizeCacheKey(String value) {
@@ -1502,6 +1894,7 @@ RegistrySelection _resolveRegistrySelection(
   ArgResults? args,
   ResolvedRoots roots,
   ShadcnConfig config,
+  bool offline,
 ) {
   final mode = (args?['registry'] as String?) ?? config.registryMode ?? 'auto';
   final pathOverride =
@@ -1520,14 +1913,14 @@ RegistrySelection _resolveRegistrySelection(
       final sourceRoot = p.dirname(localRoot);
       return RegistrySelection(
         mode: 'local',
-        registryRoot: RegistryLocation.local(localRoot),
-        sourceRoot: RegistryLocation.local(sourceRoot),
+        registryRoot: RegistryLocation.local(localRoot, offline: offline),
+        sourceRoot: RegistryLocation.local(sourceRoot, offline: offline),
       );
     }
     if (mode == 'local') {
       stderr.writeln('Error: Local registry not found.');
       stderr.writeln('Set SHADCN_REGISTRY_ROOT or --registry-path.');
-      exit(1);
+      exit(ExitCodes.registryNotFound);
     }
   }
 
@@ -1535,8 +1928,10 @@ RegistrySelection _resolveRegistrySelection(
   final remoteRoots = _resolveRemoteRoots(remoteBase);
   return RegistrySelection(
     mode: 'remote',
-    registryRoot: RegistryLocation.remote(remoteRoots.registryRoot),
-    sourceRoot: RegistryLocation.remote(remoteRoots.sourceRoot),
+    registryRoot:
+        RegistryLocation.remote(remoteRoots.registryRoot, offline: offline),
+    sourceRoot:
+        RegistryLocation.remote(remoteRoots.sourceRoot, offline: offline),
   );
 }
 
@@ -1620,6 +2015,45 @@ Map<String, String> _parseAliasPairs(List<String> entries) {
     aliases[key] = _stripLibPrefix(value);
   }
   return aliases;
+}
+
+String _expandAliasPath(String path, Map<String, String> aliases) {
+  if (aliases.isEmpty) {
+    return path;
+  }
+  if (path.startsWith('@')) {
+    final index = path.indexOf('/');
+    final name = index == -1 ? path.substring(1) : path.substring(1, index);
+    final aliasPath = aliases[name];
+    if (aliasPath != null) {
+      final suffix = index == -1 ? '' : path.substring(index + 1);
+      return suffix.isEmpty ? aliasPath : p.join(aliasPath, suffix);
+    }
+  }
+  return path;
+}
+
+bool _isLibPath(String path) {
+  if (path.startsWith('lib/')) {
+    return true;
+  }
+  if (p.isAbsolute(path)) {
+    return false;
+  }
+  if (path.startsWith('..')) {
+    return false;
+  }
+  return true;
+}
+
+String _ensureLibPrefix(String path) {
+  if (path.startsWith('lib/')) {
+    return path;
+  }
+  if (p.isAbsolute(path)) {
+    return path;
+  }
+  return p.join('lib', path);
 }
 
 String _stripLibPrefix(String value) {

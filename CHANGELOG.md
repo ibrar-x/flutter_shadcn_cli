@@ -7,13 +7,25 @@
 ## 0.1.9
 
 ### 🧾 Output & Automation
-- **NEW**: Pretty-printed `--json` output for list, search, info, doctor, and dry-run.
+- **NEW**: Pretty-printed `--json` output for list, search, info, doctor, dry-run, validate, audit, and deps.
+- **NEW**: Standardized JSON envelope with `status`, `data`, `errors`, `warnings`, `meta`.
+- **NEW**: Standardized exit codes for common failure categories.
 
 ### 🧭 CLI Ergonomics
 - **NEW**: Command aliases `ls` → `list`, `rm` → `remove`, `i` → `info`.
+- **NEW**: `--offline` mode for cache-only registry/index usage.
+- **IMPROVED**: Init flow now shows a summary and confirms before writing (unless `--yes`).
 
 ### 📚 Documentation
-- **IMPROVED**: Updated README and site docs to cover JSON output and aliases.
+- **IMPROVED**: Updated README and site docs for new commands, JSON output, offline mode, and exit codes.
+
+### ✅ Registry Integrity
+- **NEW**: `validate` command for schema + registry integrity checks.
+- **NEW**: `audit` command to compare installed components vs registry metadata.
+- **NEW**: `deps` command to compare registry deps vs pubspec.yaml.
+
+### ⚡ Performance
+- **IMPROVED**: Parallelized per-component file installs with bounded concurrency.
 
 ## 0.1.8
 

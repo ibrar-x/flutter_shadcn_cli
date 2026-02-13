@@ -1,14 +1,16 @@
-import 'dart:convert';
 import 'package:flutter_shadcn_cli/src/index_loader.dart';
+import 'package:flutter_shadcn_cli/src/exit_codes.dart';
+import 'package:flutter_shadcn_cli/src/json_output.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 
 /// Handles `flutter_shadcn list` command.
-/// 
+///
 /// Loads the index and prints all components with id, category, and description.
-Future<void> handleListCommand({
+Future<int> handleListCommand({
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
 }) async {
@@ -21,31 +23,37 @@ Future<void> handleListCommand({
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
       refresh: refresh,
+      offline: offline,
     );
 
     final index = await loader.load();
     final components = (index['components'] as List?)
-        ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
-        .toList() ??
+            ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
+            .toList() ??
         [];
 
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'list',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final payload = jsonEnvelope(
+        command: 'list',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
+          'count': components.length,
+          'components': components.map((c) => c.toJson()).toList(),
         },
-        'count': components.length,
-        'components': components.map((c) => c.toJson()).toList(),
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        meta: {
+          'exitCode': ExitCodes.success,
+        },
+      );
+      printJson(payload);
+      return ExitCodes.success;
     }
 
     if (components.isEmpty) {
       logger.info('No components found.');
-      return;
+      return ExitCodes.success;
     }
 
     // Group by category
@@ -56,23 +64,24 @@ Future<void> handleListCommand({
 
     // Print grouped with beautiful formatting
     final sortedCategories = byCategory.keys.toList()..sort();
-    
+
     for (final category in sortedCategories) {
       // Category header with emoji
       final categoryEmoji = _getCategoryEmoji(category);
       print('');
       print('$categoryEmoji  \x1B[1m${category.toUpperCase()}\x1B[0m');
       print('─' * 60);
-      
+
       final categoryComponents = byCategory[category]!;
       for (var i = 0; i < categoryComponents.length; i++) {
         final comp = categoryComponents[i];
         final isLast = i == categoryComponents.length - 1;
-        
+
         // Component name with box drawing
         final prefix = isLast ? '└─' : '├─';
-        print('  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
-        
+        print(
+            '  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
+
         // Description with subtle color
         if (comp.description.isNotEmpty) {
           final descPrefix = isLast ? '   ' : '│  ';
@@ -87,54 +96,75 @@ Future<void> handleListCommand({
     print('');
     print('═' * 60);
     logger.info('${components.length} components total.');
+    return ExitCodes.success;
   } catch (e) {
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'list',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final code = offline
+          ? ExitCodeLabels.offlineUnavailable
+          : ExitCodeLabels.networkError;
+      final payload = jsonEnvelope(
+        command: 'list',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
         },
-        'ok': false,
-        'error': e.toString(),
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        errors: [
+          jsonError(code: code, message: e.toString()),
+        ],
+        meta: {
+          'exitCode':
+              offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError,
+        },
+      );
+      printJson(payload);
+      return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
     }
     logger.error('Failed to load components: $e');
     logger.info(
         'Tip: Check your registry URL or run with --registry-url for a custom location.');
-    return;
+    return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
   }
 }
 
 /// Handles `flutter_shadcn search <query>` command.
-/// 
+///
 /// Loads the index, filters and ranks by relevance, and prints matches.
-Future<void> handleSearchCommand({
+Future<int> handleSearchCommand({
   required String query,
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
 }) async {
   if (query.isEmpty) {
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'search',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final payload = jsonEnvelope(
+        command: 'search',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
         },
-        'ok': false,
-        'error': 'Search query is required.',
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        errors: [
+          jsonError(
+            code: ExitCodeLabels.usage,
+            message: 'Search query is required.',
+          ),
+        ],
+        meta: {
+          'exitCode': ExitCodes.usage,
+        },
+      );
+      printJson(payload);
+      return ExitCodes.usage;
     }
     logger.error('Please provide a search query.');
-    return;
+    return ExitCodes.usage;
   }
 
   if (!jsonOutput) {
@@ -146,12 +176,13 @@ Future<void> handleSearchCommand({
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
       refresh: refresh,
+      offline: offline,
     );
 
     final index = await loader.load();
     var components = (index['components'] as List?)
-        ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
-        .toList() ??
+            ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
+            .toList() ??
         [];
 
     // Filter by query
@@ -164,37 +195,45 @@ Future<void> handleSearchCommand({
                 'score': c.relevanceScore(query),
               })
           .toList();
-      final payload = <String, dynamic>{
-        'command': 'search',
-        'query': query,
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final payload = jsonEnvelope(
+        command: 'search',
+        data: {
+          'query': query,
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
+          'count': results.length,
+          'results': results,
         },
-        'count': results.length,
-        'results': results,
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        meta: {
+          'exitCode': ExitCodes.success,
+        },
+      );
+      printJson(payload);
+      return ExitCodes.success;
     }
 
     if (components.isEmpty) {
       logger.info('No matches found for "$query".');
-      return;
+      return ExitCodes.success;
     }
 
     // Sort by relevance score
-    components.sort((a, b) => b.relevanceScore(query).compareTo(a.relevanceScore(query)));
+    components.sort(
+        (a, b) => b.relevanceScore(query).compareTo(a.relevanceScore(query)));
 
     print('');
     for (var i = 0; i < components.length; i++) {
       final comp = components[i];
       final score = comp.relevanceScore(query);
-      final scoreBar = '\x1B[32m${'█' * ((score / 10).ceil().clamp(0, 10))}\x1B[0m';
+      final scoreBar =
+          '\x1B[32m${'█' * ((score / 10).ceil().clamp(0, 10))}\x1B[0m';
       final isLast = i == components.length - 1;
       final prefix = isLast ? '└─' : '├─';
-      
-      print('  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
+
+      print(
+          '  $prefix \x1B[36m${comp.id.padRight(20)}\x1B[0m \x1B[1m${comp.name}\x1B[0m');
       if (comp.description.isNotEmpty) {
         final descPrefix = isLast ? '   ' : '│  ';
         print('  $descPrefix \x1B[90m${comp.description}\x1B[0m');
@@ -205,62 +244,83 @@ Future<void> handleSearchCommand({
       }
       final scorePrefix = isLast ? '   ' : '│  ';
       print('  $scorePrefix $scoreBar \x1B[90m($score pts)\x1B[0m');
-      
+
       if (!isLast) print('  │');
     }
 
     print('');
     print('═' * 60);
     logger.info('Found ${components.length} matching components.');
+    return ExitCodes.success;
   } catch (e) {
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'search',
-        'query': query,
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final code = offline
+          ? ExitCodeLabels.offlineUnavailable
+          : ExitCodeLabels.networkError;
+      final payload = jsonEnvelope(
+        command: 'search',
+        data: {
+          'query': query,
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
         },
-        'ok': false,
-        'error': e.toString(),
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        errors: [
+          jsonError(code: code, message: e.toString()),
+        ],
+        meta: {
+          'exitCode':
+              offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError,
+        },
+      );
+      printJson(payload);
+      return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
     }
     logger.error('Failed to search components: $e');
     logger.info(
         'Tip: Check your registry URL or run with --registry-url for a custom location.');
-    return;
+    return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
   }
 }
 
 /// Handles `flutter_shadcn info <id>` command.
-/// 
+///
 /// Loads the index, finds the component, and displays full details.
-Future<void> handleInfoCommand({
+Future<int> handleInfoCommand({
   required String componentId,
   required String registryBaseUrl,
   required String registryId,
   required bool refresh,
+  required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
 }) async {
   if (componentId.isEmpty) {
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'info',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final payload = jsonEnvelope(
+        command: 'info',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
         },
-        'ok': false,
-        'error': 'Component id is required.',
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        errors: [
+          jsonError(
+            code: ExitCodeLabels.usage,
+            message: 'Component id is required.',
+          ),
+        ],
+        meta: {
+          'exitCode': ExitCodes.usage,
+        },
+      );
+      printJson(payload);
+      return ExitCodes.usage;
     }
     logger.error('Please provide a component id.');
-    return;
+    return ExitCodes.usage;
   }
 
   try {
@@ -268,12 +328,13 @@ Future<void> handleInfoCommand({
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
       refresh: refresh,
+      offline: offline,
     );
 
     final index = await loader.load();
     final components = (index['components'] as List?)
-        ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
-        .toList() ??
+            ?.map((c) => IndexComponent.fromJson(c as Map<String, dynamic>))
+            .toList() ??
         [];
 
     final comp = components.firstWhere(
@@ -282,23 +343,29 @@ Future<void> handleInfoCommand({
     );
 
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'info',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final payload = jsonEnvelope(
+        command: 'info',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
+          'component': comp.toJson(),
         },
-        'component': comp.toJson(),
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        meta: {
+          'exitCode': ExitCodes.success,
+        },
+      );
+      printJson(payload);
+      return ExitCodes.success;
     }
 
     logger.section('📋 Component: ${comp.name}');
     print('');
     print('  \x1B[1mID:\x1B[0m           \x1B[36m${comp.id}\x1B[0m');
     print('  \x1B[1mName:\x1B[0m         ${comp.name}');
-    print('  \x1B[1mCategory:\x1B[0m     \x1B[35m${_getCategoryEmoji(comp.category)} ${comp.category}\x1B[0m');
+    print(
+        '  \x1B[1mCategory:\x1B[0m     \x1B[35m${_getCategoryEmoji(comp.category)} ${comp.category}\x1B[0m');
     print('  \x1B[1mDescription:\x1B[0m  \x1B[90m${comp.description}\x1B[0m');
     print('');
 
@@ -379,24 +446,35 @@ Future<void> handleInfoCommand({
       }
       print('');
     }
+    return ExitCodes.success;
   } catch (e) {
     if (jsonOutput) {
-      final payload = <String, dynamic>{
-        'command': 'info',
-        'registry': {
-          'id': registryId,
-          'baseUrl': registryBaseUrl,
+      final code = offline
+          ? ExitCodeLabels.offlineUnavailable
+          : ExitCodeLabels.networkError;
+      final payload = jsonEnvelope(
+        command: 'info',
+        data: {
+          'registry': {
+            'id': registryId,
+            'baseUrl': registryBaseUrl,
+          },
         },
-        'ok': false,
-        'error': e.toString(),
-      };
-      print(const JsonEncoder.withIndent('  ').convert(payload));
-      return;
+        errors: [
+          jsonError(code: code, message: e.toString()),
+        ],
+        meta: {
+          'exitCode':
+              offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError,
+        },
+      );
+      printJson(payload);
+      return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
     }
     logger.error('Failed to load component info: $e');
     logger.info(
         'Tip: Check your registry URL or run with --registry-url for a custom location.');
-    return;
+    return offline ? ExitCodes.offlineUnavailable : ExitCodes.networkError;
   }
 }
 

@@ -10,6 +10,8 @@
 - Applies theme presets to `color_scheme.dart`
 - Tracks installed components and per-component manifests
 - Provides discovery (list/search/info) and skill installation
+- Adds validation and audit tooling (validate/audit/deps)
+- Supports offline, cache-only operation for registry/index access
 
 ## What It Does Not Do
 

@@ -15,10 +15,16 @@ flutter_shadcn dry-run --all [--json]
 - `--all`: Preview all components.
 - `--json`: Output machine-readable JSON (pretty-printed).
 
+## Global Flags
+
+- `--offline`: Disable network calls and use cached registry data only.
+
 ## Behavior Details
 
 - Computes dependency graph
 - Shows shared items, assets, fonts, and platform changes
+- Includes per-file destinations
+- Includes per-component manifest preview
 
 ## Examples
 

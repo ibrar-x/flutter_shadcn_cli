@@ -11,17 +11,19 @@ class IndexLoader {
   final String registryId;
   final String registryBaseUrl;
   final bool refresh;
+  final bool offline;
 
   IndexLoader({
     required this.registryId,
     required this.registryBaseUrl,
     this.refresh = false,
+    this.offline = false,
   });
 
   /// Loads index.json from cache or remote, with staleness checking.
-  /// 
+  ///
   /// Returns the parsed JSON if available, otherwise throws an exception.
-  /// 
+  ///
   /// Strategy:
   /// 1. Check cache directory for existing index.json
   /// 2. If missing or stale (more than 24h old), download from {registryBaseUrl}/dist/index.json
@@ -29,6 +31,20 @@ class IndexLoader {
   /// 4. Parse and return as Map
   Future<Map<String, dynamic>> load() async {
     final cacheFile = _getCacheFile();
+    if (offline) {
+      final localPath = _resolveLocalIndexPath();
+      if (localPath != null) {
+        final file = File(localPath);
+        if (file.existsSync()) {
+          return _parseCache(file);
+        }
+      }
+      if (cacheFile.existsSync()) {
+        return _parseCache(cacheFile);
+      }
+      throw Exception('Offline mode: cached index.json not found.');
+    }
+
     final shouldRefresh = refresh || _isStale(cacheFile);
 
     if (!shouldRefresh && cacheFile.existsSync()) {
@@ -58,7 +74,7 @@ class IndexLoader {
   File _getCacheFile() {
     final expandedPath = _cacheDir.replaceFirst('~', _getHomeDir());
     final cacheDir = Directory(p.join(expandedPath, registryId));
-    
+
     if (!cacheDir.existsSync()) {
       cacheDir.createSync(recursive: true);
     }
@@ -118,9 +134,8 @@ class IndexLoader {
 
   /// Resolves the full URL to the remote index.json.
   String _resolveIndexUrl() {
-    final base = registryBaseUrl.endsWith('/')
-        ? registryBaseUrl
-        : '$registryBaseUrl/';
+    final base =
+        registryBaseUrl.endsWith('/') ? registryBaseUrl : '$registryBaseUrl/';
     return '${base}index.json';
   }
 

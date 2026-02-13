@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:flutter_shadcn_cli/src/exit_codes.dart';
 
 /// Manages the shadcn_flutter Studio lifecycle:
 /// - install: scaffolds studio app and registry package
@@ -66,8 +67,9 @@ class StudioManager {
 
     final studioDir = Directory(p.join(projectRoot, '.shadcn', 'studio'));
     if (!studioDir.existsSync()) {
-      print('Error: Studio not installed. Run: flutter_shadcn studio --install');
-      exit(1);
+      print(
+          'Error: Studio not installed. Run: flutter_shadcn studio --install');
+      exit(ExitCodes.configInvalid);
     }
 
     // 1. Ensure tokens.json exists
@@ -94,8 +96,9 @@ class StudioManager {
 
     final studioDir = Directory(p.join(projectRoot, '.shadcn', 'studio'));
     if (!studioDir.existsSync()) {
-      print('Error: Studio not installed. Run: flutter_shadcn studio --install');
-      exit(1);
+      print(
+          'Error: Studio not installed. Run: flutter_shadcn studio --install');
+      exit(ExitCodes.configInvalid);
     }
 
     // Check if sync is needed
@@ -134,7 +137,7 @@ class StudioManager {
     final studioDir = Directory(p.join(projectRoot, '.shadcn', 'studio'));
     final studioExists = studioDir.existsSync();
     checks['Studio installed'] = studioExists;
-    _printCheck('Studio installed', studioExists, 
+    _printCheck('Studio installed', studioExists,
         path: studioExists ? studioDir.path : null);
 
     if (!studioExists) {
@@ -144,7 +147,8 @@ class StudioManager {
     }
 
     // Check 3: Studio registry exists
-    final registryDir = Directory(p.join(projectRoot, '.shadcn', 'studio_registry'));
+    final registryDir =
+        Directory(p.join(projectRoot, '.shadcn', 'studio_registry'));
     final registryExists = registryDir.existsSync();
     checks['Studio registry package'] = registryExists;
     _printCheck('Studio registry package', registryExists,
@@ -180,27 +184,29 @@ class StudioManager {
     final pubspecFile = File(p.join(projectRoot, 'pubspec.yaml'));
     if (!pubspecFile.existsSync()) {
       print('Error: pubspec.yaml not found in project root');
-      exit(1);
+      exit(ExitCodes.configInvalid);
     }
 
     final content = await pubspecFile.readAsString();
-    final nameMatch = RegExp(r'^name:\s*(.+)$', multiLine: true).firstMatch(content);
+    final nameMatch =
+        RegExp(r'^name:\s*(.+)$', multiLine: true).firstMatch(content);
     if (nameMatch == null) {
       print('Error: Could not find package name in pubspec.yaml');
-      exit(1);
+      exit(ExitCodes.configInvalid);
     }
 
     return nameMatch.group(1)!.trim();
   }
 
-  Future<void> _copyStudioTemplate(Directory studioDir, String appPackageName) async {
+  Future<void> _copyStudioTemplate(
+      Directory studioDir, String appPackageName) async {
     // Get CLI package root
     final cliRoot = await _getCliRoot();
     final templateDir = Directory(p.join(cliRoot, 'templates', 'studio'));
 
     if (!templateDir.existsSync()) {
       print('Error: Studio template not found at: ${templateDir.path}');
-      exit(1);
+      exit(ExitCodes.ioError);
     }
 
     print('  Copying studio template...');
@@ -300,7 +306,7 @@ Do not edit files here directly - they may be regenerated.
 
   Future<void> _ensureTokensFile() async {
     final tokensFile = File(p.join(projectRoot, '.shadcn', 'tokens.json'));
-    
+
     if (tokensFile.existsSync()) {
       print('  tokens.json already exists');
       return;
@@ -331,36 +337,38 @@ Do not edit files here directly - they may be regenerated.
   Future<List<String>> _getInstalledComponents() async {
     // Scan the components directory to find what's installed
     final installPath = 'lib/ui/shadcn'; // TODO: read from config or defaults
-    final componentsDir = Directory(p.join(projectRoot, installPath, 'components'));
-    
+    final componentsDir =
+        Directory(p.join(projectRoot, installPath, 'components'));
+
     if (!componentsDir.existsSync()) {
       print('  No components directory found');
       return [];
     }
 
     final installed = <String>[];
-    
+
     await for (final entity in componentsDir.list()) {
       if (entity is Directory) {
         final componentName = p.basename(entity.path);
         // Check if it has a main dart file or meta.json
         final mainFile = File(p.join(entity.path, '$componentName.dart'));
         final metaFile = File(p.join(entity.path, 'meta.json'));
-        
+
         if (mainFile.existsSync() || metaFile.existsSync()) {
           installed.add(componentName);
         }
       }
     }
-    
+
     return installed..sort();
   }
 
   Future<void> _generateStudioRegistry(List<String> installedComponents) async {
-    final registryDir = Directory(p.join(projectRoot, '.shadcn', 'studio_registry'));
-    
+    final registryDir =
+        Directory(p.join(projectRoot, '.shadcn', 'studio_registry'));
+
     print('  Generating studio registry package...');
-    
+
     // Create directory structure
     await registryDir.create(recursive: true);
     final libDir = Directory(p.join(registryDir.path, 'lib'));
@@ -384,28 +392,29 @@ Do not edit files here directly - they may be regenerated.
     // Copy preview files from registry for installed components
     final previewImports = <String>[];
     final previewEntries = <String>[];
-    
+
     if (registryRoot != null && installedComponents.isNotEmpty) {
       for (final componentId in installedComponents) {
         final previewSource = File(
           p.join(registryRoot!, 'components', componentId, 'preview.dart'),
         );
-        
+
         if (previewSource.existsSync()) {
           print('    Processing preview for: $componentId');
-          
+
           // Read and transform preview file
           var previewContent = await previewSource.readAsString();
-          
+
           // Replace __APP_PACKAGE__ placeholder with actual package name
-          previewContent = previewContent.replaceAll('__APP_PACKAGE__', appPackageName);
-          
+          previewContent =
+              previewContent.replaceAll('__APP_PACKAGE__', appPackageName);
+
           // Write to studio_registry
           final previewDest = File(
             p.join(componentsDir.path, '${componentId}_preview.dart'),
           );
           await previewDest.writeAsString(previewContent);
-          
+
           // Add to imports and entries
           final importAlias = componentId.replaceAll('-', '_');
           previewImports.add(
@@ -425,7 +434,8 @@ Do not edit files here directly - they may be regenerated.
       previewImports,
       previewEntries,
     );
-    final compatFile = File(p.join(libDir.path, 'preview_registry_compat.dart'));
+    final compatFile =
+        File(p.join(libDir.path, 'preview_registry_compat.dart'));
     await compatFile.writeAsString(compatContent);
 
     // Generate preview_registry.dart (for studio template compatibility)
@@ -436,21 +446,24 @@ Do not edit files here directly - they may be regenerated.
     );
     final registryFile = File(p.join(libDir.path, 'preview_registry.dart'));
     await registryFile.writeAsString(registryContent);
-    
+
     // Also generate modern_preview_registry.dart for future use
     final modernRegistryContent = _generatePreviewRegistry(
       installedComponents,
       previewImports,
       previewEntries,
     );
-    final modernRegistryFile = File(p.join(libDir.path, 'modern_preview_registry.dart'));
+    final modernRegistryFile =
+        File(p.join(libDir.path, 'modern_preview_registry.dart'));
     await modernRegistryFile.writeAsString(modernRegistryContent);
 
     // Update studio's local preview_registry.dart to import from registry package
     final studioDir = Directory(p.join(projectRoot, '.shadcn', 'studio'));
     if (studioDir.existsSync()) {
-      final studioRegistryContent = _generateStudioLocalPreviewRegistry(previewImports.isNotEmpty);
-      final studioPreviewFile = File(p.join(studioDir.path, 'lib', 'preview_registry.dart'));
+      final studioRegistryContent =
+          _generateStudioLocalPreviewRegistry(previewImports.isNotEmpty);
+      final studioPreviewFile =
+          File(p.join(studioDir.path, 'lib', 'preview_registry.dart'));
       await studioPreviewFile.writeAsString(studioRegistryContent);
       print('  ✓ Updated studio preview_registry.dart');
     }
@@ -546,13 +559,12 @@ class PreviewEntry {
     List<String> imports,
     List<String> entries,
   ) {
-    final importsSection = imports.isEmpty 
-        ? '// No previews available yet'
-        : imports.join('\n');
+    final importsSection =
+        imports.isEmpty ? '// No previews available yet' : imports.join('\n');
     final entriesSection = entries.isEmpty
         ? '  // Preview entries will be added as components are installed'
         : entries.join('\n');
-    
+
     return '''
 import 'preview_types.dart';
 $importsSection
@@ -573,7 +585,7 @@ $entriesSection
   ) {
     // Generate adapter for studio template
     final previewAdapters = <String>[];
-    
+
     // Parse imports to extract component aliases
     for (final import in imports) {
       // import 'components/button_preview.dart' as button;
@@ -588,11 +600,11 @@ $entriesSection
   )''');
       }
     }
-    
+
     final adaptersSection = previewAdapters.isEmpty
         ? '// No previews available yet'
         : previewAdapters.join(',\n');
-    
+
     return '''
 import 'package:flutter/material.dart';
 ${imports.join('\n')}
@@ -688,7 +700,8 @@ Color? _colorFromHex(String value) {
 
   Future<bool> _checkNeedsSync() async {
     final configFile = File(p.join(projectRoot, '.shadcn', 'config.json'));
-    final lastSyncFile = File(p.join(projectRoot, '.shadcn', 'studio', '.last_sync'));
+    final lastSyncFile =
+        File(p.join(projectRoot, '.shadcn', 'studio', '.last_sync'));
 
     if (!lastSyncFile.existsSync()) {
       return true; // Never synced

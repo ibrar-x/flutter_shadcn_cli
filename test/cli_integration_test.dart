@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 
 import '../bin/shadcn.dart' as cli;
 import 'package:flutter_shadcn_cli/src/config.dart';
+import 'package:flutter_shadcn_cli/src/exit_codes.dart';
 
 void main() {
   group('CLI integration', () {
@@ -153,6 +154,99 @@ void main() {
       expect(buttonFile.existsSync(), isTrue);
       expect(dialogFile.existsSync(), isTrue);
     });
+
+    test('init installs typography fonts when requested', () async {
+      await cli.main([
+        'init',
+        '--yes',
+        '--install-fonts',
+        '--registry',
+        'local',
+        '--registry-path',
+        registryRoot.path,
+      ]);
+
+      final typographyFile = File(
+        p.join(
+          appRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'components',
+          'typography_fonts',
+          'typography_fonts.dart',
+        ),
+      );
+      expect(typographyFile.existsSync(), isTrue);
+    });
+
+    test('validate reports schema failures', () async {
+      exitCode = 0;
+      final invalidRegistry =
+          Directory(p.join(tempRoot.path, 'invalid_registry'))
+            ..createSync(recursive: true);
+      File(p.join(invalidRegistry.path, 'components.json'))
+          .writeAsStringSync('{"schemaVersion":1}');
+
+      await cli.main([
+        'validate',
+        '--registry',
+        'local',
+        '--registry-path',
+        invalidRegistry.path,
+      ]);
+
+      expect(exitCode, ExitCodes.schemaInvalid);
+    });
+
+    test('sync preserves component manifests', () async {
+      await cli.main([
+        'add',
+        'button',
+        '--registry',
+        'local',
+        '--registry-path',
+        registryRoot.path,
+      ]);
+
+      await cli.main([
+        'sync',
+      ]);
+
+      final manifestFile = File(
+        p.join(appRoot.path, '.shadcn', 'components', 'button.json'),
+      );
+      expect(manifestFile.existsSync(), isTrue);
+    });
+
+    test('offline list uses cached index', () async {
+      exitCode = 0;
+      final registryUrl = 'https://example.com/registry';
+      final registryId =
+          registryUrl.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final home = Platform.environment['HOME'] ??
+          Platform.environment['USERPROFILE'] ??
+          tempRoot.path;
+      final cacheDir = Directory(
+        p.join(home, '.flutter_shadcn', 'cache', registryId),
+      );
+      cacheDir.createSync(recursive: true);
+      File(p.join(cacheDir.path, 'index.json')).writeAsStringSync(
+        jsonEncode({'components': []}),
+      );
+
+      await cli.main([
+        'list',
+        '--registry',
+        'remote',
+        '--registry-url',
+        registryUrl,
+        '--offline',
+        '--json',
+      ]);
+
+      expect(exitCode, ExitCodes.success);
+    });
   });
 }
 
@@ -167,6 +261,12 @@ void _writeRegistryFixtures(Directory registryRoot) {
     ..createSync(recursive: true);
   final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
     ..createSync(recursive: true);
+  final typographyDir =
+      Directory(p.join(root, 'registry', 'components', 'typography_fonts'))
+        ..createSync(recursive: true);
+  final iconDir =
+      Directory(p.join(root, 'registry', 'components', 'icon_fonts'))
+        ..createSync(recursive: true);
 
   File(p.join(componentsDir.path, 'button.dart'))
       .writeAsStringSync('class Button {}');
@@ -182,6 +282,15 @@ void _writeRegistryFixtures(Directory registryRoot) {
       .writeAsStringSync('class ThemeHelper {}');
   File(p.join(sharedUtilDir.path, 'util.dart'))
       .writeAsStringSync('class UtilHelper {}');
+
+  File(p.join(typographyDir.path, 'typography_fonts.dart'))
+      .writeAsStringSync('class TypographyFonts {}');
+  File(p.join(typographyDir.path, 'meta.json'))
+      .writeAsStringSync('{"id":"typography_fonts"}');
+  File(p.join(iconDir.path, 'icon_fonts.dart'))
+      .writeAsStringSync('class IconFonts {}');
+  File(p.join(iconDir.path, 'meta.json'))
+      .writeAsStringSync('{"id":"icon_fonts"}');
 
   final registryJson = {
     'schemaVersion': 1,
@@ -255,6 +364,54 @@ void _writeRegistryFixtures(Directory registryRoot) {
         ],
         'shared': [],
         'dependsOn': ['button'],
+        'pubspec': {'dependencies': {}},
+        'assets': [],
+        'postInstall': []
+      },
+      {
+        'id': 'typography_fonts',
+        'name': 'Typography Fonts',
+        'description': 'Typography font assets',
+        'category': 'utility',
+        'version': '1.0.0',
+        'tags': ['assets'],
+        'files': [
+          {
+            'source':
+                'registry/components/typography_fonts/typography_fonts.dart',
+            'destination':
+                '{installPath}/components/typography_fonts/typography_fonts.dart'
+          },
+          {
+            'source': 'registry/components/typography_fonts/meta.json',
+            'destination': '{installPath}/components/typography_fonts/meta.json'
+          }
+        ],
+        'shared': [],
+        'dependsOn': [],
+        'pubspec': {'dependencies': {}},
+        'assets': [],
+        'postInstall': []
+      },
+      {
+        'id': 'icon_fonts',
+        'name': 'Icon Fonts',
+        'description': 'Icon font assets',
+        'category': 'utility',
+        'version': '1.0.0',
+        'tags': ['assets'],
+        'files': [
+          {
+            'source': 'registry/components/icon_fonts/icon_fonts.dart',
+            'destination': '{installPath}/components/icon_fonts/icon_fonts.dart'
+          },
+          {
+            'source': 'registry/components/icon_fonts/meta.json',
+            'destination': '{installPath}/components/icon_fonts/meta.json'
+          }
+        ],
+        'shared': [],
+        'dependsOn': [],
         'pubspec': {'dependencies': {}},
         'assets': [],
         'postInstall': []

@@ -15,13 +15,46 @@ This document provides comprehensive documentation for every command in `flutter
 7. [theme](#theme)
 8. [sync](#sync)
 9. [doctor](#doctor)
-10. [list](#list)
-11. [search](#search)
-12. [info](#info)
-13. [install-skill](#install-skill)
-14. [version](#version)
-15. [upgrade](#upgrade)
-16. [feedback](#feedback)
+10. [validate](#validate)
+11. [audit](#audit)
+12. [deps](#deps)
+13. [list](#list)
+14. [search](#search)
+15. [info](#info)
+16. [install-skill](#install-skill)
+17. [version](#version)
+18. [upgrade](#upgrade)
+19. [feedback](#feedback)
+20. [docs](#docs)
+
+---
+
+## JSON Output & Exit Codes
+
+Commands that support `--json` return a consistent envelope:
+
+- `status`: `ok` or `error`
+- `command`: command name
+- `data`: command-specific payload
+- `errors` / `warnings`: structured issues
+- `meta`: timestamp and `exitCode`
+
+Common exit codes:
+
+- `2` usage error
+- `10` registry not found
+- `20` schema invalid
+- `30` component missing
+- `31` file missing
+- `40` network error
+- `41` offline cache unavailable
+- `50` validation failed
+- `60` config invalid
+- `70` IO error
+
+Offline mode:
+
+Use `--offline` to disable network calls and rely on cached registry/index data.
 
 ---
 
@@ -480,6 +513,82 @@ flutter_shadcn doctor --verbose
 - **`components.schema.json`**: Provides the rules for what valid components look like; used as reference for validation.
 - **Cache paths**: Helps diagnose cache issues (staleness, size, location) and guides users on how to refresh.
 - **Configured paths**: Verifies user-configured paths are actually valid before commands try to use them.
+
+---
+
+## validate
+
+### What it does
+Validates registry integrity and schema correctness.
+
+**Key responsibilities:**
+- Validates `components.json` against JSON Schema
+- Verifies each `files.source` exists
+- Ensures `dependsOn` component IDs exist
+- Ensures file dependencies exist
+
+**Usage:**
+```bash
+flutter_shadcn validate
+flutter_shadcn validate --json
+```
+
+### Files Used
+
+| File Path | Purpose | Why |
+|-----------|---------|-----|
+| `components.json` | Registry data | Validation target |
+| `components.schema.json` | Schema | Enforces structure |
+
+---
+
+## audit
+
+### What it does
+Audits installed components against registry metadata and local files.
+
+**Key responsibilities:**
+- Compares installed versions/tags to registry values
+- Checks for missing component files
+- Detects missing per-component manifests
+
+**Usage:**
+```bash
+flutter_shadcn audit
+flutter_shadcn audit --json
+```
+
+### Files Used
+
+| File Path | Purpose | Why |
+|-----------|---------|-----|
+| `.shadcn/components/<id>.json` | Per-component manifests | Installed metadata |
+| `<installPath>/components.json` | Install manifest | Fallback install metadata |
+| `components.json` | Registry metadata | Compare versions/tags |
+
+---
+
+## deps
+
+### What it does
+Compares registry dependency requirements to `pubspec.yaml`.
+
+**Key responsibilities:**
+- Aggregates registry dependencies (installed or all)
+- Reports missing or mismatched versions
+
+**Usage:**
+```bash
+flutter_shadcn deps
+flutter_shadcn deps --all --json
+```
+
+### Files Used
+
+| File Path | Purpose | Why |
+|-----------|---------|-----|
+| `pubspec.yaml` | Project dependencies | Comparison target |
+| `components.json` | Registry metadata | Dependency sources |
 
 ---
 
@@ -1144,6 +1253,30 @@ list/search/info ──→ Use cache + registry/index.json
     
 install-skill ───→ Manages AI model folders
 ```
+
+---
+
+## docs
+
+### What it does
+Regenerates the web-friendly documentation site under `/doc/site`.
+
+**Key responsibilities:**
+- Ensures command docs exist for every CLI command
+- Rebuilds the command index from metadata
+
+**Usage:**
+```bash
+flutter_shadcn docs
+flutter_shadcn docs --generate
+```
+
+### Files Used
+
+| File Path | Purpose | Why |
+|-----------|---------|-----|
+| `doc/site/commands/index.md` | Command index | Updated from metadata |
+| `doc/site/commands/*.md` | Command pages | Ensures stubs exist |
 
 ---
 
