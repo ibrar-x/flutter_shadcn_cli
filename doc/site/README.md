@@ -1,17 +1,21 @@
-# flutter_shadcn_cli Documentation (Site)
+# flutter_shadcn_cli Documentation
 
-This site is generated from the CLI documentation and source behavior. It is organized for web browsing and deep understanding of how the CLI works.
+This site is versioned.
 
-## Start Here
+## Versions
 
-- [Overview](overview.md)
-- [Getting Started](getting-started.md)
-- [Core Concepts](concepts.md)
-- [Command Reference](commands/index.md)
-- [Skills System](skills/index.md)
-- [Registry and Schema](registry/index.md)
-- [Internals and Architecture](internals/architecture.md)
-- [Troubleshooting](troubleshooting.md)
-- [Testing](testing.md)
-- [Changelog Summary](changelog.md)
-- [Source File Map](source-map.md)
+- [v0.2.0 (Current, Multi-Registry)](v0.2.0/README.md)
+- [v0.1.9 (Legacy, Single-Registry)](v0.1.9/README.md)
+
+## Quick Navigation
+
+- [Current Overview](v0.2.0/overview.md)
+- [Current Getting Started](v0.2.0/getting-started.md)
+- [Current Command Reference](v0.2.0/commands/index.md)
+- [Legacy Overview](v0.1.9/overview.md)
+- [Legacy Command Reference](v0.1.9/commands/index.md)
+
+## Notes
+
+- `v0.2.0` is the active system and includes multi-registry, namespace addressing (`@namespace/component`), inline init actions, `registries`, and `default` commands.
+- `v0.1.9` is retained for compatibility and migration reference.

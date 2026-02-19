@@ -1,0 +1,64 @@
+{
+  "id": "shadcn_entry",
+  "displayName": "Shadcn",
+  "maintainers": ["team"],
+  "repo": "https://github.com/example/repo",
+  "license": "MIT",
+  "minCliVersion": "0.1.0",
+  "baseUrl": "https://example.com/registry/",
+  "paths": {
+    "componentsJson": "components.json"
+  },
+  "install": {
+    "namespace": "shadcn",
+    "root": "lib/ui/shadcn"
+  },
+  "init": {
+    "version": 1,
+    "actions": [
+      {
+        "type": "ensureDirs",
+        "dirs": ["lib/ui/shadcn", "assets/fonts"]
+      },
+      {
+        "type": "copyFiles",
+        "base": "registry",
+        "destBase": "lib/ui/shadcn",
+        "files": ["registry/shared/theme/color_scheme.dart"]
+      },
+      {
+        "type": "copyDir",
+        "base": "registry",
+        "destBase": "lib/ui/shadcn",
+        "from": "components",
+        "to": "components",
+        "index": "registry/components/index.json"
+      },
+      {
+        "type": "mergePubspec",
+        "dependencies": {
+          "gap": "^3.0.1"
+        },
+        "devDependencies": {
+          "lints": "^6.1.0"
+        },
+        "flutterAssets": ["assets/fonts/GeistSans-Regular.ttf"],
+        "flutterFonts": [
+          {
+            "family": "GeistSans",
+            "fonts": [
+              {
+                "asset": "assets/fonts/GeistSans-Regular.ttf",
+                "weight": 400
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "message",
+        "lines": ["Init done"]
+      }
+    ]
+  }
+}

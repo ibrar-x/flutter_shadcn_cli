@@ -61,6 +61,12 @@ void main() {
       );
       expect(File(p.join(installDir, 'button.dart')).existsSync(), isTrue);
       expect(File(p.join(installDir, 'meta.json')).existsSync(), isTrue);
+      expect(File(p.join(installDir, 'README.md')).existsSync(), isFalse);
+      expect(File(p.join(installDir, 'preview.dart')).existsSync(), isFalse);
+      expect(
+        File(p.join(installDir, 'preview_state.dart')).existsSync(),
+        isFalse,
+      );
       expect(
         File(
           p.join(
@@ -180,6 +186,422 @@ void main() {
       expect(typographyFile.existsSync(), isTrue);
     });
 
+    test('add namespace-qualified component works with legacy config/state',
+        () async {
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'registryMode': 'local',
+          'registryPath': registryRoot.path,
+          'installPath': 'lib/ui/shadcn',
+          'sharedPath': 'lib/ui/shadcn/shared',
+          'includeMeta': true,
+        }),
+      );
+      File(p.join(appRoot.path, '.shadcn', 'state.json')).writeAsStringSync(
+        jsonEncode({
+          'installPath': 'lib/ui/shadcn',
+          'sharedPath': 'lib/ui/shadcn/shared',
+          'managedDependencies': ['gap']
+        }),
+      );
+
+      await cli.main([
+        'add',
+        'shadcn:button',
+      ]);
+
+      final installFile = File(
+        p.join(
+          appRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'components',
+          'button',
+          'button.dart',
+        ),
+      );
+      expect(installFile.existsSync(), isTrue);
+      final migratedState = jsonDecode(
+        File(p.join(appRoot.path, '.shadcn', 'state.json')).readAsStringSync(),
+      ) as Map<String, dynamic>;
+      expect(migratedState['registries'], isA<Map>());
+    });
+
+    test('add @namespace/component installs from selected registry', () async {
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'registryMode': 'local',
+          'registryPath': registryRoot.path,
+          'installPath': 'lib/ui/shadcn',
+          'sharedPath': 'lib/ui/shadcn/shared',
+          'includeMeta': true,
+        }),
+      );
+      await cli.main([
+        'add',
+        '@shadcn/button',
+      ]);
+
+      final installFile = File(
+        p.join(
+          appRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'components',
+          'button',
+          'button.dart',
+        ),
+      );
+      expect(installFile.existsSync(), isTrue);
+    });
+
+    test(
+        'add --include-files=preview with @namespace installs preview and preview_state',
+        () async {
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'registryMode': 'local',
+          'registryPath': registryRoot.path,
+          'installPath': 'lib/ui/shadcn',
+          'sharedPath': 'lib/ui/shadcn/shared',
+          'includeMeta': true,
+        }),
+      );
+      await cli.main([
+        'add',
+        '@shadcn/button',
+        '--include-files=preview',
+      ]);
+
+      final installDir = p.join(
+        appRoot.path,
+        'lib',
+        'ui',
+        'shadcn',
+        'components',
+        'button',
+      );
+      expect(File(p.join(installDir, 'button.dart')).existsSync(), isTrue);
+      expect(File(p.join(installDir, 'preview.dart')).existsSync(), isTrue);
+      expect(
+        File(p.join(installDir, 'preview_state.dart')).existsSync(),
+        isTrue,
+      );
+      expect(File(p.join(installDir, 'meta.json')).existsSync(), isFalse);
+      expect(File(p.join(installDir, 'README.md')).existsSync(), isFalse);
+    });
+
+    test('default command sets default namespace and registries list works',
+        () async {
+      final altRegistry = Directory(p.join(tempRoot.path, 'alt_registry'))
+        ..createSync(recursive: true);
+      _writeRegistryFixtures(altRegistry);
+
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'defaultNamespace': 'shadcn',
+          'registries': {
+            'shadcn': {
+              'registryMode': 'local',
+              'registryPath': registryRoot.path,
+              'installPath': 'lib/ui/shadcn',
+              'sharedPath': 'lib/ui/shadcn/shared',
+              'enabled': true
+            },
+            'alt': {
+              'registryMode': 'local',
+              'registryPath': altRegistry.path,
+              'installPath': 'lib/ui/alt',
+              'sharedPath': 'lib/ui/alt/shared',
+              'enabled': true
+            }
+          }
+        }),
+      );
+
+      await cli.main(['default', 'alt']);
+      final config = jsonDecode(
+        File(p.join(appRoot.path, '.shadcn', 'config.json')).readAsStringSync(),
+      ) as Map<String, dynamic>;
+      expect(config['defaultNamespace'], 'alt');
+
+      await cli.main(['registries', '--json', '--offline']);
+
+      await cli.main(['add', 'button']);
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'alt',
+            'components',
+            'button',
+            'button.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
+    test(
+        'init namespace executes inline init actions from registries directory',
+        () async {
+      final fixture = jsonDecode(
+        File(
+          p.join(
+            originalCwd.path,
+            'test',
+            'fixtures',
+            'registry_inline_init_entry.json',
+          ),
+        ).readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final registryEntry = Map<String, dynamic>.from(fixture);
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        final path = request.uri.path;
+        if (path == '/registries.json') {
+          final entry = Map<String, dynamic>.from(registryEntry)
+            ..['baseUrl'] = 'https://example.com/registry/'
+            ..['paths'] = {'componentsJson': 'components.json'};
+          request.response.write(
+            jsonEncode({
+              'schemaVersion': 1,
+              'registries': [entry],
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/shared/theme/color_scheme.dart') {
+          request.response.write('class AppColorScheme {}');
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/index.json') {
+          request.response.write(
+            jsonEncode({
+              'files': ['registry/components/button/button.dart'],
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/button/button.dart') {
+          request.response.write('class Button {}');
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 404;
+        await request.response.close();
+      });
+
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'defaultNamespace': 'shadcn',
+          'registries': {
+            'shadcn': {
+              'registryMode': 'remote',
+              'registryUrl': 'http://${server.address.host}:${server.port}/',
+              'baseUrl': 'http://${server.address.host}:${server.port}/',
+              'installPath': 'lib/ui/shadcn',
+              'sharedPath': 'lib/ui/shadcn/shared',
+              'enabled': true
+            }
+          }
+        }),
+      );
+
+      await cli.main([
+        'init',
+        'shadcn',
+        '--registries-url',
+        'http://${server.address.host}:${server.port}/registries.json',
+      ]);
+
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'components',
+            'button',
+            'button.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'shared',
+            'theme',
+            'color_scheme.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
+    test('assets and remove use inline registry actions when available',
+        () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        final path = request.uri.path;
+        if (path == '/registries.json') {
+          request.response.write(
+            jsonEncode({
+              'schemaVersion': 1,
+              'registries': [
+                {
+                  'id': 'shadcn_entry',
+                  'displayName': 'Shadcn',
+                  'maintainers': ['team'],
+                  'repo': 'https://example.com/repo',
+                  'license': 'MIT',
+                  'minCliVersion': '0.1.0',
+                  'baseUrl': 'https://example.com/registry/',
+                  'paths': {'componentsJson': 'components.json'},
+                  'install': {'namespace': 'shadcn', 'root': 'lib/ui/shadcn'},
+                  'init': {
+                    'version': 1,
+                    'actions': [
+                      {
+                        'type': 'ensureDirs',
+                        'dirs': ['assets/fonts']
+                      },
+                      {
+                        'type': 'copyFiles',
+                        'base': 'registry',
+                        'destBase': 'lib/ui/shadcn',
+                        'files': ['registry/shared/fonts/typography_fonts.dart']
+                      },
+                      {
+                        'type': 'mergePubspec',
+                        'dependencies': {'google_fonts': '^6.2.1'},
+                        'flutterAssets': ['assets/fonts/GeistSans-Regular.ttf'],
+                        'flutterFonts': [
+                          {
+                            'family': 'GeistSans',
+                            'fonts': [
+                              {
+                                'asset': 'assets/fonts/GeistSans-Regular.ttf',
+                                'weight': 400
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/components.json') {
+          request.response.write(
+            jsonEncode({
+              'schemaVersion': 1,
+              'name': 'inline_assets',
+              'flutter': {'minSdk': '3.0.0'},
+              'defaults': {
+                'installPath': 'lib/ui/shadcn',
+                'sharedPath': 'lib/ui/shadcn/shared',
+              },
+              'shared': [],
+              'components': [],
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/shared/fonts/typography_fonts.dart') {
+          request.response.write('class TypographyFonts {}');
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 404;
+        await request.response.close();
+      });
+
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'defaultNamespace': 'shadcn',
+          'registries': {
+            'shadcn': {
+              'registryMode': 'remote',
+              'registryUrl': 'http://${server.address.host}:${server.port}/',
+              'baseUrl': 'http://${server.address.host}:${server.port}/',
+              'installPath': 'lib/ui/shadcn',
+              'sharedPath': 'lib/ui/shadcn/shared',
+              'enabled': true
+            }
+          }
+        }),
+      );
+
+      await cli.main([
+        'assets',
+        '--typography',
+        '--registries-url',
+        'http://${server.address.host}:${server.port}/registries.json',
+      ]);
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'shared',
+            'fonts',
+            'typography_fonts.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+
+      await cli.main([
+        'remove',
+        'typography_fonts',
+        '--registries-url',
+        'http://${server.address.host}:${server.port}/registries.json',
+      ]);
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'shared',
+            'fonts',
+            'typography_fonts.dart',
+          ),
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
     test('validate reports schema failures', () async {
       exitCode = 0;
       final invalidRegistry =
@@ -247,6 +669,77 @@ void main() {
 
       expect(exitCode, ExitCodes.success);
     });
+
+    test('default command accepts --registries-path for local registries.json',
+        () async {
+      final localRegistriesFile =
+          File(p.join(appRoot.path, 'dev_registry', 'registries.json'))
+            ..createSync(recursive: true);
+      localRegistriesFile.writeAsStringSync(
+        jsonEncode({
+          'schemaVersion': 1,
+          'registries': [
+            {
+              'id': 'local_dev',
+              'displayName': 'Local Dev',
+              'maintainers': ['team'],
+              'repo': 'https://github.com/example/local-dev',
+              'license': 'MIT',
+              'minCliVersion': '0.1.0',
+              'baseUrl': 'https://example.com/local-dev/',
+              'paths': {'componentsJson': 'components.json'},
+              'install': {'namespace': 'localdev', 'root': 'lib/ui/localdev'}
+            }
+          ]
+        }),
+      );
+
+      await cli.main([
+        'default',
+        'localdev',
+        '--registries-path',
+        localRegistriesFile.path,
+      ]);
+
+      final updated = await ShadcnConfig.load(appRoot.path);
+      final entry = updated.registryConfig('localdev');
+      expect(updated.effectiveDefaultNamespace, 'localdev');
+      expect(entry, isNotNull);
+      expect(entry?.baseUrl, 'https://example.com/local-dev/');
+      expect(entry?.installPath, 'lib/ui/localdev');
+    });
+
+    test('list/search accept @namespace registry token', () async {
+      exitCode = 0;
+      final badRemote = 'http://127.0.0.1:9/unreachable/';
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'defaultNamespace': 'orient_ui',
+          'registries': {
+            'shadcn': {
+              'registryMode': 'local',
+              'registryPath': registryRoot.path,
+              'installPath': 'lib/ui/shadcn',
+              'sharedPath': 'lib/ui/shadcn/shared',
+              'enabled': true
+            },
+            'orient_ui': {
+              'registryMode': 'remote',
+              'registryUrl': badRemote,
+              'baseUrl': badRemote,
+              'enabled': true
+            }
+          }
+        }),
+      );
+
+      await cli.main(['list', '@shadcn', '--json']);
+      expect(exitCode, ExitCodes.success);
+
+      exitCode = 0;
+      await cli.main(['search', '@shadcn', 'button', '--json']);
+      expect(exitCode, ExitCodes.success);
+    });
   });
 }
 
@@ -261,6 +754,15 @@ void _writeRegistryFixtures(Directory registryRoot) {
     ..createSync(recursive: true);
   final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
     ..createSync(recursive: true);
+  final sharedColorExtensionsDir =
+      Directory(p.join(root, 'registry', 'shared', 'color_extensions'))
+        ..createSync(recursive: true);
+  final sharedFormControlDir =
+      Directory(p.join(root, 'registry', 'shared', 'form_control'))
+        ..createSync(recursive: true);
+  final sharedFormValueSupplierDir =
+      Directory(p.join(root, 'registry', 'shared', 'form_value_supplier'))
+        ..createSync(recursive: true);
   final typographyDir =
       Directory(p.join(root, 'registry', 'components', 'typography_fonts'))
         ..createSync(recursive: true);
@@ -270,8 +772,13 @@ void _writeRegistryFixtures(Directory registryRoot) {
 
   File(p.join(componentsDir.path, 'button.dart'))
       .writeAsStringSync('class Button {}');
+  File(p.join(componentsDir.path, 'README.md')).writeAsStringSync('# Button');
   File(p.join(componentsDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"button"}');
+  File(p.join(componentsDir.path, 'preview.dart'))
+      .writeAsStringSync('class ButtonPreview {}');
+  File(p.join(componentsDir.path, 'preview_state.dart'))
+      .writeAsStringSync('class ButtonPreviewState {}');
 
   File(p.join(dialogDir.path, 'dialog.dart'))
       .writeAsStringSync('class Dialog {}');
@@ -282,6 +789,12 @@ void _writeRegistryFixtures(Directory registryRoot) {
       .writeAsStringSync('class ThemeHelper {}');
   File(p.join(sharedUtilDir.path, 'util.dart'))
       .writeAsStringSync('class UtilHelper {}');
+  File(p.join(sharedColorExtensionsDir.path, 'color_extensions.dart'))
+      .writeAsStringSync('class ColorExtensions {}');
+  File(p.join(sharedFormControlDir.path, 'form_control.dart'))
+      .writeAsStringSync('class FormControl {}');
+  File(p.join(sharedFormValueSupplierDir.path, 'form_value_supplier.dart'))
+      .writeAsStringSync('class FormValueSupplier {}');
 
   File(p.join(typographyDir.path, 'typography_fonts.dart'))
       .writeAsStringSync('class TypographyFonts {}');
@@ -318,6 +831,35 @@ void _writeRegistryFixtures(Directory registryRoot) {
             'destination': '{sharedPath}/util/util.dart'
           }
         ]
+      },
+      {
+        'id': 'color_extensions',
+        'files': [
+          {
+            'source': 'registry/shared/color_extensions/color_extensions.dart',
+            'destination': '{sharedPath}/color_extensions/color_extensions.dart'
+          }
+        ]
+      },
+      {
+        'id': 'form_control',
+        'files': [
+          {
+            'source': 'registry/shared/form_control/form_control.dart',
+            'destination': '{sharedPath}/form_control/form_control.dart'
+          }
+        ]
+      },
+      {
+        'id': 'form_value_supplier',
+        'files': [
+          {
+            'source':
+                'registry/shared/form_value_supplier/form_value_supplier.dart',
+            'destination':
+                '{sharedPath}/form_value_supplier/form_value_supplier.dart'
+          }
+        ]
       }
     ],
     'components': [
@@ -337,6 +879,18 @@ void _writeRegistryFixtures(Directory registryRoot) {
           {
             'source': 'registry/components/button/meta.json',
             'destination': '{installPath}/components/button/meta.json'
+          },
+          {
+            'source': 'registry/components/button/README.md',
+            'destination': '{installPath}/components/button/README.md'
+          },
+          {
+            'source': 'registry/components/button/preview.dart',
+            'destination': '{installPath}/components/button/preview.dart'
+          },
+          {
+            'source': 'registry/components/button/preview_state.dart',
+            'destination': '{installPath}/components/button/preview_state.dart'
           }
         ],
         'shared': ['theme'],
@@ -421,6 +975,40 @@ void _writeRegistryFixtures(Directory registryRoot) {
 
   File(p.join(registryRoot.path, 'components.json')).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert(registryJson));
+  File(p.join(registryRoot.path, 'index.json')).writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert({
+      'components': [
+        {
+          'id': 'button',
+          'name': 'Button',
+          'category': 'control',
+          'description': 'Button component',
+          'tags': ['core'],
+          'install': 'flutter_shadcn add button',
+          'import': 'package:app/ui/shadcn/components/button/button.dart',
+          'importPath': 'ui/shadcn/components/button/button.dart',
+          'api': {},
+          'examples': {},
+          'dependencies': {},
+          'related': ['dialog']
+        },
+        {
+          'id': 'dialog',
+          'name': 'Dialog',
+          'category': 'overlay',
+          'description': 'Dialog component',
+          'tags': ['overlay'],
+          'install': 'flutter_shadcn add dialog',
+          'import': 'package:app/ui/shadcn/components/dialog/dialog.dart',
+          'importPath': 'ui/shadcn/components/dialog/dialog.dart',
+          'api': {},
+          'examples': {},
+          'dependencies': {},
+          'related': ['button']
+        }
+      ]
+    }),
+  );
 }
 
 void _writePubspec(Directory targetRoot) {

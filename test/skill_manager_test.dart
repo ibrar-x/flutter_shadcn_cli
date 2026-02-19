@@ -18,9 +18,10 @@ void main() {
     setUp(() async {
       tempRoot = Directory.systemTemp.createTempSync('skill_manager_test_');
       projectRoot = Directory(p.join(tempRoot.path, 'project'))..createSync();
-      skillsRoot = Directory(p.join(tempRoot.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'skills'))
+      skillsRoot = Directory(p.join(
+          tempRoot.path, 'shadcn_flutter_kit', 'flutter_shadcn_kit', 'skills'))
         ..createSync(recursive: true);
-      
+
       logger = CliLogger(verbose: false);
       skillManager = SkillManager(
         projectRoot: projectRoot.path,
@@ -40,7 +41,7 @@ void main() {
         // Create skill in kit registry
         final skillDir = Directory(p.join(skillsRoot.path, 'flutter-shadcn-ui'))
           ..createSync(recursive: true);
-        
+
         _createSkillManifest(skillDir.path, {
           'id': 'flutter-shadcn-ui',
           'name': 'Flutter Shadcn UI',
@@ -56,34 +57,48 @@ void main() {
         });
 
         File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# Skill');
-        File(p.join(skillDir.path, 'INSTALLATION.md')).writeAsStringSync('# Installation');
+        File(p.join(skillDir.path, 'INSTALLATION.md'))
+            .writeAsStringSync('# Installation');
         Directory(p.join(skillDir.path, 'references')).createSync();
-        File(p.join(skillDir.path, 'references', 'commands.md')).writeAsStringSync('# Commands');
-        File(p.join(skillDir.path, 'references', 'examples.md')).writeAsStringSync('# Examples');
+        File(p.join(skillDir.path, 'references', 'commands.md'))
+            .writeAsStringSync('# Commands');
+        File(p.join(skillDir.path, 'references', 'examples.md'))
+            .writeAsStringSync('# Examples');
 
         // Install skill
         final modelDir = Directory(p.join(projectRoot.path, '.claude'))
           ..createSync();
-        
+
         await skillManager.installSkill(
           skillId: 'flutter-shadcn-ui',
           model: '.claude',
         );
 
         // Verify files were copied
-        final installedSkill = Directory(p.join(modelDir.path, 'skills', 'flutter-shadcn-ui'));
+        final installedSkill =
+            Directory(p.join(modelDir.path, 'skills', 'flutter-shadcn-ui'));
         expect(installedSkill.existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'INSTALLATION.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'references', 'commands.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'references', 'examples.md')).existsSync(), isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'INSTALLATION.md')).existsSync(),
+            isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'references', 'commands.md'))
+                .existsSync(),
+            isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'references', 'examples.md'))
+                .existsSync(),
+            isTrue);
       });
 
       test('finds skill in parent directory skills folder', () async {
         // Create skill in parent directory
-        final parentSkillsDir = Directory(p.join(tempRoot.path, 'skills', 'my-skill'))
-          ..createSync(recursive: true);
-        
+        final parentSkillsDir =
+            Directory(p.join(tempRoot.path, 'skills', 'my-skill'))
+              ..createSync(recursive: true);
+
         _createSkillManifest(parentSkillsDir.path, {
           'id': 'my-skill',
           'name': 'My Skill',
@@ -92,8 +107,9 @@ void main() {
             'main': 'SKILL.md',
           }
         });
-        
-        File(p.join(parentSkillsDir.path, 'SKILL.md')).writeAsStringSync('# My Skill');
+
+        File(p.join(parentSkillsDir.path, 'SKILL.md'))
+            .writeAsStringSync('# My Skill');
 
         final modelDir = Directory(p.join(projectRoot.path, '.cursor'))
           ..createSync();
@@ -103,9 +119,11 @@ void main() {
           model: '.cursor',
         );
 
-        final installedSkill = Directory(p.join(modelDir.path, 'skills', 'my-skill'));
+        final installedSkill =
+            Directory(p.join(modelDir.path, 'skills', 'my-skill'));
         expect(installedSkill.existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
       });
 
       test('creates placeholder when skill not found', () async {
@@ -118,23 +136,25 @@ void main() {
         );
 
         // Should create placeholder manifest
-        final installedSkill = Directory(p.join(modelDir.path, 'skills', 'nonexistent-skill'));
+        final installedSkill =
+            Directory(p.join(modelDir.path, 'skills', 'nonexistent-skill'));
         expect(installedSkill.existsSync(), isTrue);
-        
+
         final manifestFile = File(p.join(installedSkill.path, 'manifest.json'));
         expect(manifestFile.existsSync(), isTrue);
-        
+
         final manifest = jsonDecode(manifestFile.readAsStringSync());
         expect(manifest['skill']['id'], equals('nonexistent-skill'));
         expect(manifest['note'], contains('placeholder'));
       });
-      
+
       test('requires skill.json or skill.yaml manifest', () async {
         // Create skill directory without manifest
         final skillDir = Directory(p.join(skillsRoot.path, 'no-manifest-skill'))
           ..createSync(recursive: true);
-        
-        File(p.join(skillDir.path, 'README.md')).writeAsStringSync('# No Manifest Skill');
+
+        File(p.join(skillDir.path, 'README.md'))
+            .writeAsStringSync('# No Manifest Skill');
 
         Directory(p.join(projectRoot.path, '.claude')).createSync();
 
@@ -147,11 +167,11 @@ void main() {
           throwsA(isA<Exception>()),
         );
       });
-      
+
       test('accepts skill.yaml as alternative to skill.json', () async {
         final skillDir = Directory(p.join(skillsRoot.path, 'yaml-skill'))
           ..createSync(recursive: true);
-        
+
         // Create skill.yaml instead of skill.json
         File(p.join(skillDir.path, 'skill.yaml')).writeAsStringSync('''
 id: yaml-skill
@@ -160,8 +180,9 @@ version: 1.0.0
 files:
   main: SKILL.md
 ''');
-        
-        File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# YAML Skill');
+
+        File(p.join(skillDir.path, 'SKILL.md'))
+            .writeAsStringSync('# YAML Skill');
 
         Directory(p.join(projectRoot.path, '.claude')).createSync();
 
@@ -182,10 +203,11 @@ files:
     });
 
     group('File Copying', () {
-      test('copies only AI-focused files, excludes manifest and schemas', () async {
+      test('copies only AI-focused files, excludes manifest and schemas',
+          () async {
         final skillDir = Directory(p.join(skillsRoot.path, 'test-skill'))
           ..createSync(recursive: true);
-        
+
         _createSkillManifest(skillDir.path, {
           'id': 'test-skill',
           'name': 'Test Skill',
@@ -203,12 +225,17 @@ files:
 
         // Create all files
         File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# Skill');
-        File(p.join(skillDir.path, 'INSTALLATION.md')).writeAsStringSync('# Install');
-        File(p.join(skillDir.path, 'skill.yaml')).writeAsStringSync('id: test-skill');
+        File(p.join(skillDir.path, 'INSTALLATION.md'))
+            .writeAsStringSync('# Install');
+        File(p.join(skillDir.path, 'skill.yaml'))
+            .writeAsStringSync('id: test-skill');
         Directory(p.join(skillDir.path, 'references')).createSync();
-        File(p.join(skillDir.path, 'references', 'commands.md')).writeAsStringSync('# Commands');
-        File(p.join(skillDir.path, 'references', 'schemas.md')).writeAsStringSync('# Schemas');
-        File(p.join(skillDir.path, 'references', 'examples.md')).writeAsStringSync('# Examples');
+        File(p.join(skillDir.path, 'references', 'commands.md'))
+            .writeAsStringSync('# Commands');
+        File(p.join(skillDir.path, 'references', 'schemas.md'))
+            .writeAsStringSync('# Schemas');
+        File(p.join(skillDir.path, 'references', 'examples.md'))
+            .writeAsStringSync('# Examples');
 
         final modelDir = Directory(p.join(projectRoot.path, '.claude'))
           ..createSync();
@@ -218,24 +245,39 @@ files:
           model: '.claude',
         );
 
-        final installedSkill = Directory(p.join(modelDir.path, 'skills', 'test-skill'));
-        
+        final installedSkill =
+            Directory(p.join(modelDir.path, 'skills', 'test-skill'));
+
         // Should copy AI-focused files
-        expect(File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'INSTALLATION.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'references', 'commands.md')).existsSync(), isTrue);
-        expect(File(p.join(installedSkill.path, 'references', 'examples.md')).existsSync(), isTrue);
-        
+        expect(
+            File(p.join(installedSkill.path, 'SKILL.md')).existsSync(), isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'INSTALLATION.md')).existsSync(),
+            isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'references', 'commands.md'))
+                .existsSync(),
+            isTrue);
+        expect(
+            File(p.join(installedSkill.path, 'references', 'examples.md'))
+                .existsSync(),
+            isTrue);
+
         // Should NOT copy management files
-        expect(File(p.join(installedSkill.path, 'skill.json')).existsSync(), isFalse);
-        expect(File(p.join(installedSkill.path, 'skill.yaml')).existsSync(), isFalse);
-        expect(File(p.join(installedSkill.path, 'references', 'schemas.md')).existsSync(), isFalse);
+        expect(File(p.join(installedSkill.path, 'skill.json')).existsSync(),
+            isFalse);
+        expect(File(p.join(installedSkill.path, 'skill.yaml')).existsSync(),
+            isFalse);
+        expect(
+            File(p.join(installedSkill.path, 'references', 'schemas.md'))
+                .existsSync(),
+            isFalse);
       });
 
       test('maintains directory structure during copy', () async {
         final skillDir = Directory(p.join(skillsRoot.path, 'structure-skill'))
           ..createSync(recursive: true);
-        
+
         _createSkillManifest(skillDir.path, {
           'id': 'structure-skill',
           'name': 'Structure Skill',
@@ -250,9 +292,10 @@ files:
 
         File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# Skill');
         Directory(p.join(skillDir.path, 'references', 'deep', 'nested'))
-          ..createSync(recursive: true);
-        File(p.join(skillDir.path, 'references', 'deep', 'nested', 'commands.md'))
-          .writeAsStringSync('# Nested Commands');
+            .createSync(recursive: true);
+        File(p.join(
+                skillDir.path, 'references', 'deep', 'nested', 'commands.md'))
+            .writeAsStringSync('# Nested Commands');
 
         final modelDir = Directory(p.join(projectRoot.path, '.gemini'))
           ..createSync();
@@ -271,7 +314,7 @@ files:
           'nested',
           'commands.md',
         ));
-        
+
         expect(installedFile.existsSync(), isTrue);
         expect(installedFile.readAsStringSync(), equals('# Nested Commands'));
       });
@@ -298,11 +341,13 @@ files:
 
         // Verify both installations exist
         expect(
-          Directory(p.join(projectRoot.path, '.claude', 'skills', 'skill-1')).existsSync(),
+          Directory(p.join(projectRoot.path, '.claude', 'skills', 'skill-1'))
+              .existsSync(),
           isTrue,
         );
         expect(
-          Directory(p.join(projectRoot.path, '.cursor', 'skills', 'skill-1')).existsSync(),
+          Directory(p.join(projectRoot.path, '.cursor', 'skills', 'skill-1'))
+              .existsSync(),
           isTrue,
         );
       });
@@ -316,18 +361,22 @@ files:
           'version': '1.0.0',
           'files': {'main': 'SKILL.md'}
         });
-        File(p.join(skillDir.path, 'SKILL.md')).writeAsStringSync('# Removable');
+        File(p.join(skillDir.path, 'SKILL.md'))
+            .writeAsStringSync('# Removable');
 
         Directory(p.join(projectRoot.path, '.claude')).createSync();
 
-        await skillManager.installSkill(skillId: 'removable-skill', model: '.claude');
-        
-        final installedDir = Directory(p.join(projectRoot.path, '.claude', 'skills', 'removable-skill'));
+        await skillManager.installSkill(
+            skillId: 'removable-skill', model: '.claude');
+
+        final installedDir = Directory(
+            p.join(projectRoot.path, '.claude', 'skills', 'removable-skill'));
         expect(installedDir.existsSync(), isTrue);
 
         // Uninstall
-        await skillManager.uninstallSkill(skillId: 'removable-skill', model: '.claude');
-        
+        await skillManager.uninstallSkill(
+            skillId: 'removable-skill', model: '.claude');
+
         expect(installedDir.existsSync(), isFalse);
       });
     });
@@ -339,14 +388,14 @@ files:
         Directory(p.join(projectRoot.path, '.cursor')).createSync();
         Directory(p.join(projectRoot.path, '.gpt4')).createSync();
         Directory(p.join(projectRoot.path, '.gemini')).createSync();
-        
+
         // Create non-model folders (should be ignored)
         Directory(p.join(projectRoot.path, '.git')).createSync();
         Directory(p.join(projectRoot.path, '.dart_tool')).createSync();
         Directory(p.join(projectRoot.path, 'lib')).createSync();
 
         final models = skillManager.discoverModelFolders();
-        
+
         // Should discover model folders but not .git, .dart_tool, or lib
         expect(models, contains('.claude'));
         expect(models, contains('.cursor'));
@@ -357,14 +406,16 @@ files:
 
       test('auto-creates model folders if they do not exist', () async {
         // Initially no model folders
-        expect(Directory(p.join(projectRoot.path, '.claude')).existsSync(), isFalse);
+        expect(Directory(p.join(projectRoot.path, '.claude')).existsSync(),
+            isFalse);
 
         final models = skillManager.discoverModelFolders();
-        
+
         // Should have created standard model folders
         expect(models, isNotEmpty);
         expect(models, contains('.claude'));
-        expect(Directory(p.join(projectRoot.path, '.claude')).existsSync(), isTrue);
+        expect(Directory(p.join(projectRoot.path, '.claude')).existsSync(),
+            isTrue);
       });
     });
 
@@ -384,8 +435,9 @@ files:
         Directory(p.join(projectRoot.path, '.cursor')).createSync();
 
         // Install to .claude
-        await skillManager.installSkill(skillId: 'shared-skill', model: '.claude');
-        
+        await skillManager.installSkill(
+            skillId: 'shared-skill', model: '.claude');
+
         // Create symlink from .cursor to .claude
         await skillManager.symlinkSkill(
           skillId: 'shared-skill',
@@ -393,11 +445,12 @@ files:
           model: '.cursor',
         );
 
-        final symlinkPath = p.join(projectRoot.path, '.cursor', 'skills', 'shared-skill');
+        final symlinkPath =
+            p.join(projectRoot.path, '.cursor', 'skills', 'shared-skill');
         final link = Link(symlinkPath);
-        
+
         expect(link.existsSync(), isTrue);
-        
+
         // Verify symlink points to correct location
         final target = link.targetSync();
         expect(target, contains('.claude'));

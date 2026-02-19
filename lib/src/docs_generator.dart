@@ -26,6 +26,10 @@ const _commandDocs = <CommandDocMeta>[
   CommandDocMeta(name: 'assets', description: 'Install font/icon assets.'),
   CommandDocMeta(
       name: 'platform', description: 'Manage platform target files.'),
+  CommandDocMeta(
+      name: 'registries', description: 'List available/configured registries.'),
+  CommandDocMeta(
+      name: 'default', description: 'Set or show default registry namespace.'),
   CommandDocMeta(name: 'theme', description: 'Manage theme presets.'),
   CommandDocMeta(
       name: 'sync', description: 'Sync paths and theme from config.'),

@@ -4,7 +4,7 @@ class CliLogger {
   final bool verbose;
   final bool useColor;
 
-    CliLogger({this.verbose = false, bool? useColor})
+  CliLogger({this.verbose = false, bool? useColor})
       : useColor = useColor ?? stdout.supportsAnsiEscapes;
 
   static const _reset = '\u001b[0m';

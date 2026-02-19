@@ -370,35 +370,6 @@ class SkillManager {
     return models..sort();
   }
 
-  List<String> _findTemplateModels() {
-    final templateRoot = _findRemotionVideosRoot();
-    if (templateRoot != null) {
-      final models = _listHiddenDirs(templateRoot);
-      if (models.isNotEmpty) {
-        return models;
-      }
-    }
-
-    // Return the default list of known AI models
-    return _getKnownAIModels();
-  }
-
-  String? _findRemotionVideosRoot() {
-    var current = Directory(projectRoot);
-    while (true) {
-      final candidate = Directory(p.join(current.path, 'remotion-videos'));
-      if (candidate.existsSync()) {
-        return candidate.path;
-      }
-
-      final parent = current.parent;
-      if (parent.path == current.path) {
-        return null;
-      }
-      current = parent;
-    }
-  }
-
   /// Lists available skills from skills.json index.
   Future<void> listAvailableSkills() async {
     logger

@@ -1,0 +1,608 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flutter-shadcn.github.io/registry-directory/registries/registries.schema.json",
+  "title": "Registry Directory Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "registries"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "registries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/registry"
+      }
+    }
+  },
+  "$defs": {
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "maintainers",
+        "repo",
+        "license",
+        "minCliVersion",
+        "baseUrl",
+        "paths",
+        "install"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_\\-]{1,63}$",
+          "description": "Stable identifier for the registry entry in registries.json (lowercase, URL/CLI safe)."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "maintainers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "repo": {
+          "type": "string",
+          "format": "uri"
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "minCliVersion": {
+          "type": "string",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:[-+][0-9A-Za-z.-]+)?$",
+          "description": "SemVer string specifying the minimum CLI version required to safely consume this registry."
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "baseUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(https://).+",
+          "description": "HTTPS base URL that acts as the root for resolving registry-relative files."
+        },
+        "paths": {
+          "$ref": "#/$defs/paths"
+        },
+        "install": {
+          "$ref": "#/$defs/install"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        },
+        "trust": {
+          "$ref": "#/$defs/trust"
+        },
+        "init": {
+          "$ref": "#/$defs/init"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "componentsJson"
+      ],
+      "properties": {
+        "componentsJson": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "componentsSchemaJson": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "indexJson":{
+          "$ref": "#/$defs/relativePath"
+        },
+        "indexSchemaJson":{
+          "$ref": "#/$defs/relativePath"
+        },
+        "folderStructureJson": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "metaJson": {
+          "$ref": "#/$defs/relativePath"
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "root"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Registry namespace prefix used in component addressing: '<namespace>:<componentId>'."
+        },
+        "root": {
+          "type": "string",
+          "pattern": "^lib/[-a-zA-Z0-9_./]+$",
+          "description": "Install root folder inside the consumer project, e.g. 'lib/ui/shadcn' or 'lib/ui/orient'."
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sharedGroups": {
+          "type": "boolean",
+          "default": false
+        },
+        "composites": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "sha256"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 200,
+          "description": "Integrity pin for the fetched components.json file (hex or base64)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "sha256"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "init": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "actions"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ensureDirs",
+            "copyFiles",
+            "copyDir",
+            "mergePubspec",
+            "message"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ensureDirs"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/ensureDirsAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "copyFiles"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/copyFilesAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "copyDir"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/copyDirAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "mergePubspec"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/mergePubspecAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "message"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/messageAction"
+          }
+        }
+      ]
+    },
+    "ensureDirsAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "dirs"
+      ],
+      "properties": {
+        "type": {
+          "const": "ensureDirs"
+        },
+        "dirs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          }
+        }
+      }
+    },
+    "copyFilesAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "files"
+      ],
+      "properties": {
+        "type": {
+          "const": "copyFiles"
+        },
+        "base": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Source base path inside the registry (e.g. 'registry')."
+        },
+        "destBase": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Destination base path in the consumer project (e.g. 'lib/ui/shadcn')."
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          }
+        },
+        "overwrite": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "base"
+            ]
+          },
+          "then": {
+            "required": [
+              "destBase"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "destBase"
+            ]
+          },
+          "then": {
+            "required": [
+              "base"
+            ]
+          }
+        }
+      ]
+    },
+    "copyDirAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "type": {
+          "const": "copyDir"
+        },
+        "base": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Source base path inside the registry (e.g. 'registry')."
+        },
+        "destBase": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Destination base path in the consumer project (e.g. 'lib/ui/shadcn')."
+        },
+        "from": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "to": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "description": "Explicit list of files to copy. Each path is registry-relative."
+        },
+        "index": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional pointer to an index JSON file containing { files: [...] }."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "files"
+          ],
+          "not": {
+            "required": [
+              "index"
+            ]
+          }
+        },
+        {
+          "required": [
+            "index"
+          ],
+          "not": {
+            "required": [
+              "files"
+            ]
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "base"
+            ]
+          },
+          "then": {
+            "required": [
+              "destBase"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "destBase"
+            ]
+          },
+          "then": {
+            "required": [
+              "base"
+            ]
+          }
+        }
+      ],
+      "description": "Copies a directory-like set of files. Provide either files[] or index."
+    },
+    "mergePubspecAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "mergePubspec"
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "devDependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "flutterAssets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "flutterFonts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "family",
+              "fonts"
+            ],
+            "properties": {
+              "family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fonts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "asset"
+                  ],
+                  "properties": {
+                    "asset": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "weight": {
+                      "type": "integer"
+                    },
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "normal",
+                        "italic"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "messageAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "lines"
+      ],
+      "properties": {
+        "type": {
+          "const": "message"
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*\\s)(?!.*\\.\\./)(?!.*\\./\\./)[-a-zA-Z0-9_./]+$",
+      "description": "Registry-relative path. No leading '/', no spaces, no '..' segments."
+    }
+  }
+}

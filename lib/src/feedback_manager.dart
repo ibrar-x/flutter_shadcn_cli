@@ -4,64 +4,83 @@ import 'package:flutter_shadcn_cli/src/logger.dart';
 /// Manages user feedback and GitHub issue creation
 class FeedbackManager {
   final CliLogger logger;
-  
+
   static const String repoOwner = 'ibrar-x';
   static const String repoName = 'shadcn_flutter_kit';
-  
+
   FeedbackManager({required this.logger});
-  
+
   /// Shows feedback menu and handles user selection
   /// If [typeStr], [titleStr], and [bodyStr] are provided, skips interactive mode
   Future<void> showFeedbackMenu({
     String? type,
     String? title,
     String? body,
+    String? registryNamespace,
+    String? registryBaseUrl,
   }) async {
     // Non-interactive mode if all parameters provided
     if (type != null && title != null && body != null) {
       final feedbackType = _parseFeedbackType(type);
       if (feedbackType == null) {
         logger.error('Invalid feedback type: $type');
-        logger.info('Valid types: bug, feature, docs, question, performance, other');
+        logger.info(
+            'Valid types: bug, feature, docs, question, performance, other');
         return;
       }
-      
+
       await _submitFeedback(
         feedbackType: feedbackType,
         title: title,
         description: body,
+        registryNamespace: registryNamespace,
+        registryBaseUrl: registryBaseUrl,
       );
       return;
     }
-    
+
     // Interactive mode
     logger.section('💬 Feedback & Support');
     print('');
     print('Help us improve flutter_shadcn_cli! Choose feedback type:');
     print('');
-    print('  \x1B[31m1.\x1B[0m \x1B[1m🐛 Bug Report\x1B[0m       - Something isn\'t working');
-    print('  \x1B[32m2.\x1B[0m \x1B[1m✨ Feature Request\x1B[0m  - Suggest an idea');
-    print('  \x1B[33m3.\x1B[0m \x1B[1m📖 Documentation\x1B[0m    - Improve or fix docs');
-    print('  \x1B[36m4.\x1B[0m \x1B[1m❓ Question\x1B[0m         - Ask for help');
-    print('  \x1B[35m5.\x1B[0m \x1B[1m⚡ Performance\x1B[0m      - Speed or memory issues');
-    print('  \x1B[90m6.\x1B[0m \x1B[1m💡 Other\x1B[0m            - General feedback');
+    print(
+        '  \x1B[31m1.\x1B[0m \x1B[1m🐛 Bug Report\x1B[0m       - Something isn\'t working');
+    print(
+        '  \x1B[32m2.\x1B[0m \x1B[1m✨ Feature Request\x1B[0m  - Suggest an idea');
+    print(
+        '  \x1B[33m3.\x1B[0m \x1B[1m📖 Documentation\x1B[0m    - Improve or fix docs');
+    print(
+        '  \x1B[36m4.\x1B[0m \x1B[1m❓ Question\x1B[0m         - Ask for help');
+    print(
+        '  \x1B[35m5.\x1B[0m \x1B[1m⚡ Performance\x1B[0m      - Speed or memory issues');
+    print(
+        '  \x1B[90m6.\x1B[0m \x1B[1m💡 Other\x1B[0m            - General feedback');
     print('');
-    
+
     stdout.write('\x1B[1m❯\x1B[0m Select feedback type (1-6): ');
     final input = stdin.readLineSync()?.trim() ?? '';
-    
+
     final typeNum = int.tryParse(input);
     if (typeNum == null || typeNum < 1 || typeNum > 6) {
       logger.error('Invalid selection. Please choose 1-6.');
       return;
     }
-    
-    await _handleFeedbackType(typeNum);
+
+    await _handleFeedbackType(
+      typeNum,
+      registryNamespace: registryNamespace,
+      registryBaseUrl: registryBaseUrl,
+    );
   }
-  
-  Future<void> _handleFeedbackType(int typeNum) async {
+
+  Future<void> _handleFeedbackType(
+    int typeNum, {
+    String? registryNamespace,
+    String? registryBaseUrl,
+  }) async {
     final FeedbackType feedbackType;
-    
+
     switch (typeNum) {
       case 1:
         feedbackType = FeedbackType.bug;
@@ -85,10 +104,14 @@ class FeedbackManager {
         logger.error('Invalid feedback type.');
         return;
     }
-    
-    await _collectAndSubmitFeedback(feedbackType);
+
+    await _collectAndSubmitFeedback(
+      feedbackType,
+      registryNamespace: registryNamespace,
+      registryBaseUrl: registryBaseUrl,
+    );
   }
-  
+
   /// Parses feedback type string to FeedbackType enum
   FeedbackType? _parseFeedbackType(String type) {
     switch (type.toLowerCase()) {
@@ -111,27 +134,31 @@ class FeedbackManager {
         return null;
     }
   }
-  
-  Future<void> _collectAndSubmitFeedback(FeedbackType type) async {
+
+  Future<void> _collectAndSubmitFeedback(
+    FeedbackType type, {
+    String? registryNamespace,
+    String? registryBaseUrl,
+  }) async {
     print('');
     logger.section('${type.emoji} ${type.title}');
     print('');
-    
+
     // Collect title
     stdout.write('Title (brief summary): ');
     final title = stdin.readLineSync()?.trim() ?? '';
-    
+
     if (title.isEmpty) {
       logger.error('Title cannot be empty.');
       return;
     }
-    
+
     // Collect description
     print('');
     print('Description (press Enter twice when done):');
     final descriptionLines = <String>[];
     var emptyLineCount = 0;
-    
+
     while (emptyLineCount < 2) {
       final line = stdin.readLineSync() ?? '';
       if (line.isEmpty) {
@@ -141,34 +168,38 @@ class FeedbackManager {
       }
       descriptionLines.add(line);
     }
-    
+
     // Remove trailing empty lines
     while (descriptionLines.isNotEmpty && descriptionLines.last.isEmpty) {
       descriptionLines.removeLast();
     }
-    
+
     final description = descriptionLines.join('\n');
-    
+
     if (description.isEmpty) {
       logger.error('Description cannot be empty.');
       return;
     }
-    
+
     await _submitFeedback(
       feedbackType: type,
       title: title,
       description: description,
+      registryNamespace: registryNamespace,
+      registryBaseUrl: registryBaseUrl,
     );
   }
-  
+
   /// Submits feedback by creating GitHub issue via gh CLI or browser
   Future<void> _submitFeedback({
     required FeedbackType feedbackType,
     required String title,
     required String description,
+    String? registryNamespace,
+    String? registryBaseUrl,
   }) async {
     print('');
-    
+
     // Try gh CLI first (direct issue creation without browser)
     final ghAvailable = await _isGitHubCliAvailable();
     if (ghAvailable) {
@@ -176,37 +207,41 @@ class FeedbackManager {
         type: feedbackType,
         title: title,
         description: description,
+        registryNamespace: registryNamespace,
+        registryBaseUrl: registryBaseUrl,
       );
-      
+
       if (success) {
         logger.success('Thank you for your feedback! 🙏');
         return;
       }
-      
+
       // If gh fails, fall through to browser method
       logger.warn('GitHub CLI failed, falling back to browser...');
       print('');
     }
-    
+
     // Fallback: Build GitHub issue URL and open in browser
     final issueUrl = _buildGitHubIssueUrl(
       type: feedbackType,
       title: title,
       description: description,
+      registryNamespace: registryNamespace,
+      registryBaseUrl: registryBaseUrl,
     );
-    
+
     logger.info('Opening GitHub issue in your browser...');
     print('');
     print('If it doesn\'t open automatically, visit:');
     print('\x1B[36m$issueUrl\x1B[0m');
     print('');
-    
+
     // Try to open in browser
     await _openInBrowser(issueUrl);
-    
+
     logger.success('Thank you for your feedback! 🙏');
   }
-  
+
   /// Checks if GitHub CLI (gh) is installed and authenticated
   Future<bool> _isGitHubCliAvailable() async {
     try {
@@ -216,16 +251,18 @@ class FeedbackManager {
       return false;
     }
   }
-  
+
   /// Creates a GitHub issue using gh CLI
   Future<bool> _createIssueViaGh({
     required FeedbackType type,
     required String title,
     required String description,
+    String? registryNamespace,
+    String? registryBaseUrl,
   }) async {
     try {
       logger.info('Creating issue via GitHub CLI...');
-      
+
       // Build issue body with template
       final filledTemplate = _fillTemplate(type.template, description);
       final issueBody = '''
@@ -235,12 +272,13 @@ $filledTemplate
 **CLI Version:** v0.1.8
 **OS:** ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
 **Dart:** ${Platform.version}
+${_registryContextBlock(registryNamespace, registryBaseUrl)}
 ''';
-      
+
       // Create issue using gh CLI
       final labels = type.labels.join(',');
       final issueTitle = '${type.emoji} $title';
-      
+
       final result = await Process.run('gh', [
         'issue',
         'create',
@@ -253,23 +291,24 @@ $filledTemplate
         '--label',
         labels,
       ]);
-      
+
       if (result.exitCode == 0) {
         print('');
         logger.success('Issue created successfully! ✨');
-        
+
         // Extract and display issue URL from output
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty) {
           print('');
           print('\x1B[36m$output\x1B[0m');
         }
-        
+
         return true;
       } else {
         // Check for authentication errors
         final stderr = result.stderr.toString();
-        if (stderr.contains('not logged') || stderr.contains('authentication')) {
+        if (stderr.contains('not logged') ||
+            stderr.contains('authentication')) {
           logger.warn('GitHub CLI not authenticated. Run: gh auth login');
         }
         return false;
@@ -278,18 +317,20 @@ $filledTemplate
       return false;
     }
   }
-  
+
   String _buildGitHubIssueUrl({
     required FeedbackType type,
     required String title,
     required String description,
+    String? registryNamespace,
+    String? registryBaseUrl,
   }) {
     final labels = type.labels.join(',');
     final issueTitle = Uri.encodeComponent('${type.emoji} $title');
-    
+
     // Replace the first comment placeholder with user's description
     final filledTemplate = _fillTemplate(type.template, description);
-    
+
     final issueBody = '''
 $filledTemplate
 
@@ -297,33 +338,48 @@ $filledTemplate
 **CLI Version:** v0.1.8
 **OS:** ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
 **Dart:** ${Platform.version}
+${_registryContextBlock(registryNamespace, registryBaseUrl)}
 ''';
-    
+
     final encodedBody = Uri.encodeComponent(issueBody);
-    
+
     return 'https://github.com/$repoOwner/$repoName/issues/new?title=$issueTitle&body=$encodedBody&labels=$labels';
   }
-  
+
+  String _registryContextBlock(String? namespace, String? baseUrl) {
+    final lines = <String>[];
+    if (namespace != null && namespace.trim().isNotEmpty) {
+      lines.add('**Registry Namespace:** ${namespace.trim()}');
+    }
+    if (baseUrl != null && baseUrl.trim().isNotEmpty) {
+      lines.add('**Registry URL:** ${baseUrl.trim()}');
+    }
+    if (lines.isEmpty) {
+      return '';
+    }
+    return lines.join('\n');
+  }
+
   /// Fills the template by replacing the first comment placeholder with user input
   String _fillTemplate(String template, String userInput) {
     // Find the first comment placeholder (<!-- ... -->)
     final commentRegex = RegExp(r'<!--[^>]*-->');
     final match = commentRegex.firstMatch(template);
-    
+
     if (match == null) {
       // No placeholder found, just append user input at the end
       return '${template.trim()}\n$userInput';
     }
-    
+
     // Replace the first comment with user input
     return template.replaceFirst(commentRegex, userInput);
   }
-  
+
   Future<void> _openInBrowser(String url) async {
     try {
       String command;
       List<String> args;
-      
+
       if (Platform.isMacOS) {
         command = 'open';
         args = [url];
@@ -337,7 +393,7 @@ $filledTemplate
         logger.warn('Unable to open browser automatically on this platform.');
         return;
       }
-      
+
       await Process.run(command, args);
     } catch (e) {
       logger.warn('Failed to open browser automatically: $e');
@@ -352,7 +408,7 @@ enum FeedbackType {
   question,
   performance,
   other;
-  
+
   String get emoji {
     switch (this) {
       case FeedbackType.bug:
@@ -369,7 +425,7 @@ enum FeedbackType {
         return '💡';
     }
   }
-  
+
   String get title {
     switch (this) {
       case FeedbackType.bug:
@@ -386,7 +442,7 @@ enum FeedbackType {
         return 'General Feedback';
     }
   }
-  
+
   String get prefix {
     switch (this) {
       case FeedbackType.bug:
@@ -403,7 +459,7 @@ enum FeedbackType {
         return 'FEEDBACK';
     }
   }
-  
+
   List<String> get labels {
     switch (this) {
       case FeedbackType.bug:
@@ -420,7 +476,7 @@ enum FeedbackType {
         return ['feedback', 'cli'];
     }
   }
-  
+
   String get template {
     switch (this) {
       case FeedbackType.bug:

@@ -49,7 +49,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -67,6 +67,110 @@ void main() {
       expect(File(p.join(installDir, 'meta.json')).existsSync(), isTrue);
       expect(File(p.join(installDir, 'README.md')).existsSync(), isFalse);
       expect(File(p.join(installDir, 'preview.dart')).existsSync(), isFalse);
+      expect(
+        File(p.join(installDir, 'preview_state.dart')).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('registry includeFiles=preview installs preview and preview_state',
+        () async {
+      await _writeConfig(
+        targetRoot,
+        const ShadcnConfig(
+          defaultNamespace: 'shadcn',
+          registries: {
+            'shadcn': RegistryConfigEntry(
+              installPath: 'lib/ui/shadcn',
+              sharedPath: 'lib/ui/shadcn/shared',
+              includeFiles: ['preview'],
+              enabled: true,
+            ),
+          },
+        ),
+      );
+      _writePubspec(targetRoot);
+
+      final registry = await Registry.load(
+        registryRoot: RegistryLocation.local(registryRoot.path),
+        sourceRoot: RegistryLocation.local(p.dirname(registryRoot.path)),
+      );
+
+      final installer = Installer(
+        registry: registry,
+        targetDir: targetRoot.path,
+        logger: CliLogger(),
+        registryNamespace: 'shadcn',
+      );
+
+      await installer.addComponent('button');
+
+      final installDir = p.join(
+        targetRoot.path,
+        'lib',
+        'ui',
+        'shadcn',
+        'components',
+        'button',
+      );
+
+      expect(File(p.join(installDir, 'preview.dart')).existsSync(), isTrue);
+      expect(
+        File(p.join(installDir, 'preview_state.dart')).existsSync(),
+        isTrue,
+      );
+      expect(File(p.join(installDir, 'meta.json')).existsSync(), isFalse);
+      expect(File(p.join(installDir, 'README.md')).existsSync(), isFalse);
+    });
+
+    test('registry excludeFiles=preview excludes preview and preview_state',
+        () async {
+      await _writeConfig(
+        targetRoot,
+        const ShadcnConfig(
+          defaultNamespace: 'shadcn',
+          registries: {
+            'shadcn': RegistryConfigEntry(
+              installPath: 'lib/ui/shadcn',
+              sharedPath: 'lib/ui/shadcn/shared',
+              includeMeta: true,
+              excludeFiles: ['preview'],
+              enabled: true,
+            ),
+          },
+        ),
+      );
+      _writePubspec(targetRoot);
+
+      final registry = await Registry.load(
+        registryRoot: RegistryLocation.local(registryRoot.path),
+        sourceRoot: RegistryLocation.local(p.dirname(registryRoot.path)),
+      );
+
+      final installer = Installer(
+        registry: registry,
+        targetDir: targetRoot.path,
+        logger: CliLogger(),
+        registryNamespace: 'shadcn',
+      );
+
+      await installer.addComponent('button');
+
+      final installDir = p.join(
+        targetRoot.path,
+        'lib',
+        'ui',
+        'shadcn',
+        'components',
+        'button',
+      );
+
+      expect(File(p.join(installDir, 'meta.json')).existsSync(), isTrue);
+      expect(File(p.join(installDir, 'preview.dart')).existsSync(), isFalse);
+      expect(
+        File(p.join(installDir, 'preview_state.dart')).existsSync(),
+        isFalse,
+      );
     });
 
     test('supports @alias paths for install locations', () async {
@@ -91,7 +195,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -117,7 +221,8 @@ void main() {
           includeMeta: true,
         ),
       );
-      _writePubspec(targetRoot, dependencies: const {'flutter': 'sdk: flutter'});
+      _writePubspec(targetRoot,
+          dependencies: const {'flutter': 'sdk: flutter'});
 
       final registry = await Registry.load(
         registryRoot: RegistryLocation.local(registryRoot.path),
@@ -127,18 +232,18 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
 
-      final pubspec = File(p.join(targetRoot.path, 'pubspec.yaml'))
-          .readAsStringSync();
+      final pubspec =
+          File(p.join(targetRoot.path, 'pubspec.yaml')).readAsStringSync();
       expect(pubspec.contains('skeletonizer: ^2.1.0+1'), isTrue);
 
       await installer.addComponent('button');
-      final pubspecAgain = File(p.join(targetRoot.path, 'pubspec.yaml'))
-          .readAsStringSync();
+      final pubspecAgain =
+          File(p.join(targetRoot.path, 'pubspec.yaml')).readAsStringSync();
       expect(pubspecAgain.contains('skeletonizer: ^2.1.0+1'), isTrue);
     });
 
@@ -163,13 +268,13 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
 
-      final pubspec = File(p.join(targetRoot.path, 'pubspec.yaml'))
-          .readAsStringSync();
+      final pubspec =
+          File(p.join(targetRoot.path, 'pubspec.yaml')).readAsStringSync();
       expect(pubspec.contains('dependencies:'), isTrue);
       expect(pubspec.contains('skeletonizer: ^2.1.0+1'), isTrue);
     });
@@ -203,13 +308,13 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
 
-      final pubspec = File(p.join(targetRoot.path, 'pubspec.yaml'))
-          .readAsStringSync();
+      final pubspec =
+          File(p.join(targetRoot.path, 'pubspec.yaml')).readAsStringSync();
       final occurrences = RegExp('skeletonizer:').allMatches(pubspec).length;
       expect(occurrences, 1);
     });
@@ -233,7 +338,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('button');
@@ -269,7 +374,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -320,7 +425,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -359,7 +464,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.addComponent('dialog');
@@ -388,7 +493,7 @@ void main() {
       final installer = Installer(
         registry: registry,
         targetDir: targetRoot.path,
-          logger: CliLogger(),
+        logger: CliLogger(),
       );
 
       await installer.init(
@@ -414,33 +519,50 @@ void main() {
 
 void _writeRegistryFixtures(Directory registryRoot) {
   final root = p.dirname(registryRoot.path);
-  final componentsDir = Directory(p.join(root, 'registry', 'components', 'button'))
-    ..createSync(recursive: true);
+  final componentsDir =
+      Directory(p.join(root, 'registry', 'components', 'button'))
+        ..createSync(recursive: true);
   final dialogDir = Directory(p.join(root, 'registry', 'components', 'dialog'))
     ..createSync(recursive: true);
   final sharedThemeDir = Directory(p.join(root, 'registry', 'shared', 'theme'))
     ..createSync(recursive: true);
   final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
     ..createSync(recursive: true);
+  final sharedColorExtensionsDir =
+      Directory(p.join(root, 'registry', 'shared', 'color_extensions'))
+        ..createSync(recursive: true);
+  final sharedFormControlDir =
+      Directory(p.join(root, 'registry', 'shared', 'form_control'))
+        ..createSync(recursive: true);
+  final sharedFormValueSupplierDir =
+      Directory(p.join(root, 'registry', 'shared', 'form_value_supplier'))
+        ..createSync(recursive: true);
 
   File(p.join(componentsDir.path, 'button.dart'))
       .writeAsStringSync('class Button {}');
-  File(p.join(componentsDir.path, 'README.md'))
-      .writeAsStringSync('# Button');
+  File(p.join(componentsDir.path, 'README.md')).writeAsStringSync('# Button');
   File(p.join(componentsDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"button"}');
   File(p.join(componentsDir.path, 'preview.dart'))
       .writeAsStringSync('void main() {}');
+  File(p.join(componentsDir.path, 'preview_state.dart'))
+      .writeAsStringSync('class PreviewState {}');
 
-    File(p.join(dialogDir.path, 'dialog.dart'))
+  File(p.join(dialogDir.path, 'dialog.dart'))
       .writeAsStringSync('class Dialog {}');
-    File(p.join(dialogDir.path, 'meta.json'))
+  File(p.join(dialogDir.path, 'meta.json'))
       .writeAsStringSync('{"id":"dialog"}');
 
-      File(p.join(sharedThemeDir.path, 'theme.dart'))
-        .writeAsStringSync('class ThemeHelper {}');
-      File(p.join(sharedUtilDir.path, 'util.dart'))
-        .writeAsStringSync('class UtilHelper {}');
+  File(p.join(sharedThemeDir.path, 'theme.dart'))
+      .writeAsStringSync('class ThemeHelper {}');
+  File(p.join(sharedUtilDir.path, 'util.dart'))
+      .writeAsStringSync('class UtilHelper {}');
+  File(p.join(sharedColorExtensionsDir.path, 'color_extensions.dart'))
+      .writeAsStringSync('class ColorExtensions {}');
+  File(p.join(sharedFormControlDir.path, 'form_control.dart'))
+      .writeAsStringSync('class FormControl {}');
+  File(p.join(sharedFormValueSupplierDir.path, 'form_value_supplier.dart'))
+      .writeAsStringSync('class FormValueSupplier {}');
 
   final registryJson = {
     'defaults': {
@@ -465,6 +587,35 @@ void _writeRegistryFixtures(Directory registryRoot) {
             'destination': '{sharedPath}/util/util.dart'
           }
         ]
+      },
+      {
+        'id': 'color_extensions',
+        'files': [
+          {
+            'source': 'registry/shared/color_extensions/color_extensions.dart',
+            'destination': '{sharedPath}/color_extensions/color_extensions.dart'
+          }
+        ]
+      },
+      {
+        'id': 'form_control',
+        'files': [
+          {
+            'source': 'registry/shared/form_control/form_control.dart',
+            'destination': '{sharedPath}/form_control/form_control.dart'
+          }
+        ]
+      },
+      {
+        'id': 'form_value_supplier',
+        'files': [
+          {
+            'source':
+                'registry/shared/form_value_supplier/form_value_supplier.dart',
+            'destination':
+                '{sharedPath}/form_value_supplier/form_value_supplier.dart'
+          }
+        ]
       }
     ],
     'components': [
@@ -487,14 +638,16 @@ void _writeRegistryFixtures(Directory registryRoot) {
           {
             'source': 'registry/components/button/preview.dart',
             'destination': '{installPath}/components/button/preview.dart'
+          },
+          {
+            'source': 'registry/components/button/preview_state.dart',
+            'destination': '{installPath}/components/button/preview_state.dart'
           }
         ],
         'shared': [],
         'dependsOn': [],
         'pubspec': {
-          'dependencies': {
-            'skeletonizer': '^2.1.0+1'
-          }
+          'dependencies': {'skeletonizer': '^2.1.0+1'}
         }
       },
       {
@@ -512,15 +665,13 @@ void _writeRegistryFixtures(Directory registryRoot) {
         ],
         'shared': [],
         'dependsOn': ['button'],
-        'pubspec': {
-          'dependencies': {}
-        }
+        'pubspec': {'dependencies': {}}
       }
     ]
   };
 
-  File(p.join(registryRoot.path, 'components.json'))
-      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(registryJson));
+  File(p.join(registryRoot.path, 'components.json')).writeAsStringSync(
+      const JsonEncoder.withIndent('  ').convert(registryJson));
 }
 
 void _writePubspec(Directory targetRoot, {Map<String, String>? dependencies}) {
@@ -529,13 +680,15 @@ void _writePubspec(Directory targetRoot, {Map<String, String>? dependencies}) {
     ..writeln('environment:')
     ..writeln('  sdk: ">=3.3.0 <4.0.0"')
     ..writeln('dependencies:');
-  final deps = dependencies ?? {
-    'flutter': 'sdk: flutter',
-  };
+  final deps = dependencies ??
+      {
+        'flutter': 'sdk: flutter',
+      };
   deps.forEach((key, value) {
     buffer.writeln('  $key: $value');
   });
-  File(p.join(targetRoot.path, 'pubspec.yaml')).writeAsStringSync(buffer.toString());
+  File(p.join(targetRoot.path, 'pubspec.yaml'))
+      .writeAsStringSync(buffer.toString());
 }
 
 Future<void> _writeConfig(Directory targetRoot, ShadcnConfig config) async {

@@ -1,43 +1,8 @@
 # Getting Started
 
-## Install the CLI
+Choose the docs version that matches your CLI/runtime mode:
 
-```bash
-dart pub global activate flutter_shadcn_cli
-```
+- [v0.2.0 Getting Started (Recommended)](v0.2.0/getting-started.md)
+- [v0.1.9 Getting Started (Legacy)](v0.1.9/getting-started.md)
 
-Ensure your global pub cache bin is on PATH:
-
-```bash
-$HOME/.pub-cache/bin
-```
-
-## Initialize a Project
-
-```bash
-flutter_shadcn init
-```
-
-Use defaults without prompts:
-
-```bash
-flutter_shadcn init --yes
-```
-
-## Add a Component
-
-```bash
-flutter_shadcn add button
-```
-
-## Remove a Component
-
-```bash
-flutter_shadcn remove button
-```
-
-## Troubleshoot
-
-```bash
-flutter_shadcn doctor
-```
+If you are starting new work, use `v0.2.0`.

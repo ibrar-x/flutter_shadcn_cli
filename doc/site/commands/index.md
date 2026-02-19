@@ -2,7 +2,7 @@
 
 Each command is documented with purpose, syntax, options, behavior flow, files used, and examples.
 
-Aliases: `ls` → `list`, `rm` → `remove`, `i` → `info`.
+Aliases: rm → remove, ls → list, i → info.
 
 - [init](init.md)
 - [add](add.md)
@@ -10,6 +10,8 @@ Aliases: `ls` → `list`, `rm` → `remove`, `i` → `info`.
 - [dry-run](dry-run.md)
 - [assets](assets.md)
 - [platform](platform.md)
+- [registries](registries.md)
+- [default](default.md)
 - [theme](theme.md)
 - [sync](sync.md)
 - [doctor](doctor.md)

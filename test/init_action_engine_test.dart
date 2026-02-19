@@ -1,0 +1,216 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
+
+import 'package:flutter_shadcn_cli/src/init_action_engine.dart';
+import 'package:flutter_shadcn_cli/src/registry_directory.dart';
+import 'package:flutter_shadcn_cli/src/resolver_v1.dart';
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart';
+
+void main() {
+  group('InitActionEngine', () {
+    late Directory tempRoot;
+    late Directory projectRoot;
+    late HttpServer server;
+
+    setUp(() async {
+      tempRoot = Directory.systemTemp.createTempSync('shadcn_init_engine_');
+      projectRoot = Directory(p.join(tempRoot.path, 'app'))..createSync();
+      File(p.join(projectRoot.path, 'pubspec.yaml')).writeAsStringSync(
+        [
+          'name: test_app',
+          'description: test',
+          'dependencies:',
+          '  flutter: sdk: flutter',
+        ].join('\n'),
+      );
+
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        final path = request.uri.path;
+        if (path == '/registry/shared/theme/color_scheme.dart') {
+          request.response.statusCode = 200;
+          request.response.write('class AppColorScheme {}');
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/index.json') {
+          request.response.statusCode = 200;
+          request.response.write(
+            jsonEncode({
+              'files': ['registry/components/button/button.dart']
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/button/button.dart') {
+          request.response.statusCode = 200;
+          request.response.write('class Button {}');
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 404;
+        await request.response.close();
+      });
+    });
+
+    tearDown(() async {
+      await server.close(force: true);
+      if (tempRoot.existsSync()) {
+        tempRoot.deleteSync(recursive: true);
+      }
+    });
+
+    test('executes inline init actions happy path', () async {
+      final entry = await _loadFixtureEntry(
+        baseUrl: 'http://${server.address.host}:${server.port}/',
+      );
+      final engine = InitActionEngine();
+      final result = await engine.executeRegistryInit(
+        projectRoot: projectRoot.path,
+        registry: entry,
+      );
+
+      expect(result.dirsCreated, greaterThanOrEqualTo(2));
+      expect(result.filesWritten, 2);
+      expect(result.messages, contains('Init done'));
+      expect(
+        File(
+          p.join(
+            projectRoot.path,
+            'lib/ui/shadcn/shared/theme/color_scheme.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          p.join(
+            projectRoot.path,
+            'lib/ui/shadcn/components/button/button.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+
+      final pubspec =
+          File(p.join(projectRoot.path, 'pubspec.yaml')).readAsStringSync();
+      expect(pubspec.contains('gap: ^3.0.1'), isTrue);
+      expect(pubspec.contains('dev_dependencies:'), isTrue);
+      expect(pubspec.contains('lints: ^6.1.0'), isTrue);
+      expect(pubspec.contains('assets/fonts/GeistSans-Regular.ttf'), isTrue);
+      expect(pubspec.contains('family: GeistSans'), isTrue);
+    });
+
+    test('rolls back recorded inline changes', () async {
+      final entry = await _loadFixtureEntry(
+        baseUrl: 'http://${server.address.host}:${server.port}/',
+      );
+      final engine = InitActionEngine();
+      final result = await engine.executeRegistryInit(
+        projectRoot: projectRoot.path,
+        registry: entry,
+      );
+
+      final rollback = await engine.rollbackRecordedChanges(
+        projectRoot: projectRoot.path,
+        record: result.record,
+      );
+
+      expect(rollback.filesRemoved, greaterThanOrEqualTo(2));
+      expect(
+        File(
+          p.join(
+            projectRoot.path,
+            'lib/ui/shadcn/shared/theme/color_scheme.dart',
+          ),
+        ).existsSync(),
+        isFalse,
+      );
+      final pubspec =
+          File(p.join(projectRoot.path, 'pubspec.yaml')).readAsStringSync();
+      expect(pubspec.contains('gap: ^3.0.1'), isFalse);
+      expect(pubspec.contains('lints: ^6.1.0'), isFalse);
+      expect(pubspec.contains('family: GeistSans'), isFalse);
+    });
+
+    test('copyDir requires exactly one of files or index', () async {
+      final entry = await _loadFixtureEntry(
+        baseUrl: 'http://${server.address.host}:${server.port}/',
+        actions: [
+          {
+            'type': 'copyDir',
+            'base': 'registry',
+            'destBase': 'lib/ui/shadcn',
+            'from': 'components',
+            'to': 'components',
+            'files': ['registry/components/button/button.dart'],
+            'index': 'registry/components/index.json',
+          }
+        ],
+      );
+      final engine = InitActionEngine();
+
+      await expectLater(
+        () => engine.executeRegistryInit(
+          projectRoot: projectRoot.path,
+          registry: entry,
+        ),
+        throwsA(isA<InitActionEngineException>()),
+      );
+    });
+
+    test('rejects path traversal attempts on destination writes', () async {
+      final entry = await _loadFixtureEntry(
+        baseUrl: 'http://${server.address.host}:${server.port}/',
+        actions: [
+          {
+            'type': 'copyFiles',
+            'base': 'registry',
+            'destBase': '../escape',
+            'files': ['registry/shared/theme/color_scheme.dart'],
+          }
+        ],
+      );
+      final engine = InitActionEngine();
+
+      await expectLater(
+        () => engine.executeRegistryInit(
+          projectRoot: projectRoot.path,
+          registry: entry,
+        ),
+        throwsA(isA<ResolverV1Exception>()),
+      );
+    });
+  });
+}
+
+Future<RegistryDirectoryEntry> _loadFixtureEntry({
+  required String baseUrl,
+  List<dynamic>? actions,
+}) async {
+  final packageUri = await Isolate.resolvePackageUri(
+    Uri.parse('package:flutter_shadcn_cli/flutter_shadcn_cli.dart'),
+  );
+  if (packageUri == null) {
+    throw Exception('Could not resolve package root');
+  }
+  final packageRoot = p.dirname(p.dirname(File.fromUri(packageUri).path));
+  final raw = jsonDecode(
+    File(
+      p.join(
+        packageRoot,
+        'test',
+        'fixtures',
+        'registry_inline_init_entry.json',
+      ),
+    ).readAsStringSync(),
+  ) as Map<String, dynamic>;
+  raw['baseUrl'] = baseUrl;
+  if (actions != null) {
+    (raw['init'] as Map<String, dynamic>)['actions'] = actions;
+  }
+  return RegistryDirectoryEntry.fromJson(raw);
+}

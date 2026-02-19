@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:json_schema/json_schema.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
+import 'package:flutter_shadcn_cli/src/resolver_v1.dart';
 import 'package:path/path.dart' as p;
 
 class Registry {
@@ -17,6 +18,7 @@ class Registry {
     required RegistryLocation sourceRoot,
     String? schemaPath,
     String? cachePath,
+    String componentsPath = 'components.json',
     bool offline = false,
     CliLogger? logger,
   }) async {
@@ -31,9 +33,8 @@ class Registry {
       }
       content = await cacheFile.readAsString();
     } else {
-      content = await registryRoot.readString('components.json');
+      content = await registryRoot.readString(componentsPath);
     }
-    final data = jsonDecode(content);
 
     if (!offline && cachePath != null && registryRoot.isRemote) {
       try {
@@ -46,6 +47,24 @@ class Registry {
         logger?.warn('Failed to cache components.json: $e');
       }
     }
+
+    return fromContent(
+      content: content,
+      registryRoot: registryRoot,
+      sourceRoot: sourceRoot,
+      schemaPath: schemaPath,
+      logger: logger,
+    );
+  }
+
+  static Future<Registry> fromContent({
+    required String content,
+    required RegistryLocation registryRoot,
+    required RegistryLocation sourceRoot,
+    String? schemaPath,
+    CliLogger? logger,
+  }) async {
+    final data = jsonDecode(content);
 
     final schemaSource = ComponentsSchemaValidator.resolveSchemaSource(
       data: data is Map<String, dynamic> ? data : const {},
@@ -550,11 +569,16 @@ class RegistryLocation {
       }
       return response.bodyBytes;
     }
-    final file = File(p.join(root, relativePath));
-    if (!await file.exists()) {
-      throw Exception('File not found: ${file.path}');
+    final candidates = _localPathCandidates(relativePath);
+    for (final path in candidates) {
+      final file = File(p.join(root, path));
+      if (await file.exists()) {
+        return file.readAsBytes();
+      }
     }
-    return file.readAsBytes();
+
+    final attempted = File(p.join(root, relativePath)).path;
+    throw Exception('File not found: $attempted');
   }
 
   Future<String> readString(String relativePath) async {
@@ -570,9 +594,20 @@ class RegistryLocation {
   }
 
   Uri _resolveRemote(String relativePath) {
-    final normalized = relativePath.replaceFirst(RegExp(r'^/+'), '');
-    final base = root.endsWith('/') ? root : '$root/';
-    return Uri.parse(base).resolve(normalized);
+    return ResolverV1.resolveUrl(root, relativePath);
+  }
+
+  List<String> _localPathCandidates(String relativePath) {
+    final candidates = <String>[relativePath];
+    final normalized = relativePath.replaceAll('\\', '/');
+    final rootName = p.basename(root);
+    if (rootName == 'registry' && normalized.startsWith('registry/')) {
+      final stripped = normalized.substring('registry/'.length);
+      if (stripped.isNotEmpty && stripped != relativePath) {
+        candidates.add(stripped);
+      }
+    }
+    return candidates;
   }
 }
 

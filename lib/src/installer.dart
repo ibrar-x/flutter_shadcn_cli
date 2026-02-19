@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import 'registry.dart';
-import 'config.dart';
-import 'logger.dart';
-import 'theme_css.dart';
-import 'state.dart';
+import 'package:flutter_shadcn_cli/src/registry.dart';
+import 'package:flutter_shadcn_cli/src/config.dart';
+import 'package:flutter_shadcn_cli/src/logger.dart';
+import 'package:flutter_shadcn_cli/src/theme_css.dart';
+import 'package:flutter_shadcn_cli/src/state.dart';
 import 'package:flutter_shadcn_cli/registry/shared/theme/preset_theme_data.dart'
     show RegistryThemePresetData;
 
@@ -15,6 +15,13 @@ class Installer {
   final Registry registry;
   final String targetDir; // The user's project root
   final CliLogger logger;
+  final String? installPathOverride;
+  final String? sharedPathOverride;
+  final String? stateNamespace;
+  final String? registryNamespace;
+  final Set<String>? includeFileKindsOverride;
+  final Set<String>? excludeFileKindsOverride;
+  final bool enableLegacyCoreBootstrap;
   Set<String>? _installedComponentCache;
   final Set<String> _installingComponentIds = {};
   final Set<String> _installingSharedIds = {};
@@ -34,6 +41,13 @@ class Installer {
     required this.registry,
     required this.targetDir,
     CliLogger? logger,
+    this.installPathOverride,
+    this.sharedPathOverride,
+    this.stateNamespace,
+    this.registryNamespace,
+    this.includeFileKindsOverride,
+    this.excludeFileKindsOverride,
+    this.enableLegacyCoreBootstrap = true,
   }) : logger = logger ?? CliLogger();
 
   Future<void> init({
@@ -82,7 +96,7 @@ class Installer {
     ))
       ..removeWhere((id) => id.isEmpty);
     final sharedList = sharedToInstall.toList()..sort();
-    
+
     // Show what will be installed
     logger.section('Installing core shared modules');
     var totalFiles = 0;
@@ -96,7 +110,7 @@ class Installer {
     }
     logger.detail('  Total: $totalFiles files');
     print('');
-    
+
     for (final sharedId in sharedList) {
       await installShared(sharedId);
     }
@@ -564,7 +578,7 @@ class Installer {
     }
 
     final themeFile = File(_colorSchemeFilePath);
-    if (!themeFile.existsSync()) {
+    if (enableLegacyCoreBootstrap && !themeFile.existsSync()) {
       const coreShared = [
         'theme',
         'util',
@@ -1005,9 +1019,22 @@ class Installer {
   Future<void> _updateState() async {
     await _ensureConfigLoaded();
     final config = _cachedConfig ?? const ShadcnConfig();
+    final namespace = stateNamespace ?? config.effectiveDefaultNamespace;
     final installed = await _installedComponentIds();
     final required = _collectRequiredDependencies(installed);
     final managed = <String>{...required.keys, ..._coreInitDependencies};
+    final existingState = await ShadcnState.load(
+      targetDir,
+      defaultNamespace: namespace,
+    );
+    final mergedRegistries = Map<String, RegistryStateEntry>.from(
+      existingState.registries ?? const {},
+    );
+    mergedRegistries[namespace] = RegistryStateEntry(
+      installPath: _installPath(config),
+      sharedPath: _sharedPath(config),
+      themeId: config.themeId,
+    );
     await ShadcnState.save(
       targetDir,
       ShadcnState(
@@ -1015,6 +1042,7 @@ class Installer {
         sharedPath: _sharedPath(config),
         themeId: config.themeId,
         managedDependencies: managed.toList()..sort(),
+        registries: mergedRegistries,
       ),
     );
   }
@@ -2120,6 +2148,9 @@ class Installer {
   }
 
   String _installPath(ShadcnConfig? config) {
+    if (installPathOverride != null && installPathOverride!.isNotEmpty) {
+      return _expandAliases(installPathOverride!, config?.pathAliases);
+    }
     final override = config?.installPath;
     if (override != null && override.isNotEmpty) {
       return _expandAliases(override, config?.pathAliases);
@@ -2128,6 +2159,9 @@ class Installer {
   }
 
   String _sharedPath(ShadcnConfig? config) {
+    if (sharedPathOverride != null && sharedPathOverride!.isNotEmpty) {
+      return _expandAliases(sharedPathOverride!, config?.pathAliases);
+    }
     final override = config?.sharedPath;
     if (override != null && override.isNotEmpty) {
       return _expandAliases(override, config?.pathAliases);
@@ -2137,17 +2171,90 @@ class Installer {
 
   bool _shouldInstallFile(String destination) {
     final lower = destination.toLowerCase();
+    final optionalKinds = _optionalFileKinds(lower);
+    if (optionalKinds.isEmpty) {
+      return true;
+    }
+
+    final includeOverride = includeFileKindsOverride ?? const <String>{};
+    final excludeOverride = excludeFileKindsOverride ?? const <String>{};
+    if (includeOverride.isNotEmpty) {
+      return optionalKinds.any(includeOverride.contains);
+    }
+    if (excludeOverride.isNotEmpty &&
+        optionalKinds.any(excludeOverride.contains)) {
+      return false;
+    }
+
     final config = _cachedConfig ?? const ShadcnConfig();
-    if (lower.endsWith('readme.md')) {
-      return config.includeReadme ?? false;
+    final registryEntry = registryNamespace == null
+        ? null
+        : config.registryConfig(registryNamespace);
+
+    final includeFromConfig = _normalizeFileKinds(
+      registryEntry?.includeFiles ?? config.includeFiles ?? const <String>[],
+    );
+    if (includeFromConfig.isNotEmpty) {
+      return optionalKinds.any(includeFromConfig.contains);
     }
-    if (lower.endsWith('meta.json')) {
-      return config.includeMeta ?? true;
+    final excludeFromConfig = _normalizeFileKinds(
+      registryEntry?.excludeFiles ?? config.excludeFiles ?? const <String>[],
+    );
+    if (excludeFromConfig.isNotEmpty &&
+        optionalKinds.any(excludeFromConfig.contains)) {
+      return false;
     }
-    if (lower.endsWith('preview.dart')) {
-      return config.includePreview ?? false;
+
+    if (optionalKinds.contains('readme')) {
+      return registryEntry?.includeReadme ?? config.includeReadme ?? false;
+    }
+    if (optionalKinds.contains('meta')) {
+      return registryEntry?.includeMeta ?? config.includeMeta ?? true;
+    }
+    if (optionalKinds.contains('preview')) {
+      return registryEntry?.includePreview ?? config.includePreview ?? false;
     }
     return true;
+  }
+
+  Set<String> _optionalFileKinds(String destinationLower) {
+    final normalized = destinationLower.replaceAll('\\', '/');
+    final base = p.posix.basename(normalized);
+    final kinds = <String>{};
+    if (base == 'readme.md' || base.contains('readme')) {
+      kinds.add('readme');
+    }
+    if (base == 'meta.json' ||
+        base.startsWith('meta.') ||
+        base.contains('meta')) {
+      kinds.add('meta');
+    }
+    if (base.contains('preview')) {
+      kinds.add('preview');
+    }
+    return kinds;
+  }
+
+  Set<String> _normalizeFileKinds(Iterable<String> values) {
+    final normalized = <String>{};
+    for (final value in values) {
+      final token = value.trim().toLowerCase();
+      switch (token) {
+        case 'readme':
+        case 'docs':
+          normalized.add('readme');
+          break;
+        case 'meta':
+        case 'metadata':
+          normalized.add('meta');
+          break;
+        case 'preview':
+        case 'previews':
+          normalized.add('preview');
+          break;
+      }
+    }
+    return normalized;
   }
 
   ShadcnConfig? _cachedConfig;

@@ -9,14 +9,14 @@ class SkillsLoader {
   SkillsLoader({required this.skillsBasePath});
 
   /// Loads skills.json from the local registry.
-  /// 
+  ///
   /// Searches for skills.json in:
   /// 1. {skillsBasePath}/skills.json
   /// 2. {skillsBasePath}/../skills.json
   /// 3. {projectRoot}/shadcn_flutter_kit/flutter_shadcn_kit/skills/skills.json
   Future<SkillsIndex?> load() async {
     final candidates = _findSkillsJsonPaths();
-    
+
     for (final path in candidates) {
       final file = File(path);
       if (await file.exists()) {
@@ -30,7 +30,7 @@ class SkillsLoader {
         }
       }
     }
-    
+
     return null;
   }
 
