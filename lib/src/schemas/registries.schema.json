@@ -127,6 +127,16 @@
         "indexSchemaJson":{
           "$ref": "#/$defs/relativePath"
         },
+        "themesJson": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "themesSchemaJson": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "themeConverterDart": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional Dart converter script used to transform registry-specific theme JSON into the CLI theme DTO."
+        },
         "folderStructureJson": {
           "$ref": "#/$defs/relativePath"
         },
@@ -164,6 +174,10 @@
           "default": false
         },
         "composites": {
+          "type": "boolean",
+          "default": false
+        },
+        "theme": {
           "type": "boolean",
           "default": false
         }
@@ -351,8 +365,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "type",
-        "files"
+        "type"
       ],
       "properties": {
         "type": {
@@ -372,6 +385,18 @@
           "items": {
             "$ref": "#/$defs/relativePath"
           }
+        },
+        "from": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional directory source root when using directory-copy semantics."
+        },
+        "to": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional destination root when using directory-copy semantics."
+        },
+        "index": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional pointer to an index JSON file containing { files: [...] }."
         },
         "overwrite": {
           "type": "boolean",
@@ -401,6 +426,82 @@
             "required": [
               "base"
             ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "from"
+            ]
+          },
+          "then": {
+            "required": [
+              "to"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "to"
+            ]
+          },
+          "then": {
+            "required": [
+              "from"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "from",
+              "to"
+            ]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": [
+                  "files"
+                ],
+                "not": {
+                  "required": [
+                    "index"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "index"
+                ],
+                "not": {
+                  "required": [
+                    "files"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "required": [
+                "from",
+                "to"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "files"
+            ],
+            "not": {
+              "required": [
+                "index"
+              ]
+            }
           }
         }
       ]
@@ -496,7 +597,7 @@
           }
         }
       ],
-      "description": "Copies a directory-like set of files. Provide either files[] or index."
+      "description": "Deprecated alias for copyFiles with from/to. Copies a directory-like set of files. Provide either files[] or index."
     },
     "mergePubspecAction": {
       "type": "object",

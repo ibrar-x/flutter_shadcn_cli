@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_shadcn_cli/src/infrastructure/validation/schema_validator.dart';
+import 'package:flutter_shadcn_cli/src/logger.dart';
+import 'package:flutter_shadcn_cli/src/resolver_v1.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -12,15 +15,23 @@ class IndexLoader {
 
   final String registryId;
   final String registryBaseUrl;
+  final String indexPath;
+  final String? indexSchemaPath;
   final bool refresh;
   final bool offline;
+  final CliLogger? logger;
+  final SchemaValidator schemaValidator;
 
   IndexLoader({
     required this.registryId,
     required this.registryBaseUrl,
+    this.indexPath = 'index.json',
+    this.indexSchemaPath,
     this.refresh = false,
     this.offline = false,
-  });
+    this.logger,
+    SchemaValidator? schemaValidator,
+  }) : schemaValidator = schemaValidator ?? SchemaValidator();
 
   /// Loads index.json from cache or remote, with staleness checking.
   ///
@@ -38,11 +49,15 @@ class IndexLoader {
       if (localPath != null) {
         final file = File(localPath);
         if (file.existsSync()) {
-          return _parseCache(file);
+          final data = await _parseCache(file);
+          await _validateIndexSchema(data);
+          return data;
         }
       }
       if (cacheFile.existsSync()) {
-        return _parseCache(cacheFile);
+        final data = await _parseCache(cacheFile);
+        await _validateIndexSchema(data);
+        return data;
       }
       throw Exception('Offline mode: cached index.json not found.');
     }
@@ -51,7 +66,9 @@ class IndexLoader {
 
     if (!shouldRefresh && cacheFile.existsSync()) {
       try {
-        return await _parseCache(cacheFile);
+        final data = await _parseCache(cacheFile);
+        await _validateIndexSchema(data);
+        return data;
       } catch (e) {
         // Cache corrupted, fall through to download
       }
@@ -59,11 +76,15 @@ class IndexLoader {
 
     // Download from remote
     try {
-      return await _downloadAndCache();
+      final data = await _downloadAndCache();
+      await _validateIndexSchema(data);
+      return data;
     } catch (e) {
       if (cacheFile.existsSync()) {
         try {
-          return await _parseCache(cacheFile);
+          final data = await _parseCache(cacheFile);
+          await _validateIndexSchema(data);
+          return data;
         } catch (_) {
           // ignore cache fallback
         }
@@ -136,9 +157,8 @@ class IndexLoader {
 
   /// Resolves the full URL to the remote index.json.
   String _resolveIndexUrl() {
-    final base =
-        registryBaseUrl.endsWith('/') ? registryBaseUrl : '$registryBaseUrl/';
-    return '${base}index.json';
+    final path = ResolverV1.normalizeRelativePath(indexPath);
+    return ResolverV1.resolveUrl(registryBaseUrl, path).toString();
   }
 
   String? _resolveLocalIndexPath() {
@@ -161,7 +181,10 @@ class IndexLoader {
     }
 
     final normalized = p.normalize(basePath);
+    final normalizedIndexPath = indexPath.trim().isEmpty ? 'index.json' : indexPath;
     final candidates = <String>[
+      p.join(normalized, normalizedIndexPath),
+      p.join(normalized, 'registry', normalizedIndexPath),
       p.join(normalized, 'index.json'),
       p.join(normalized, 'registry', 'index.json'),
     ];
@@ -182,5 +205,23 @@ class IndexLoader {
       return env['USERPROFILE'] ?? env['HOME'] ?? '.';
     }
     return env['HOME'] ?? '.';
+  }
+
+  Future<void> _validateIndexSchema(Map<String, dynamic> data) async {
+    final schemaPath = indexSchemaPath?.trim();
+    if (schemaPath == null || schemaPath.isEmpty) {
+      return;
+    }
+    final result = await schemaValidator.validate(
+      data: data,
+      baseUrl: registryBaseUrl,
+      schemaPath: schemaPath,
+      logger: logger,
+    );
+    if (!result.isValid) {
+      logger?.warn(
+        'index.json schema validation failed (${result.errors.length} issues).',
+      );
+    }
   }
 }

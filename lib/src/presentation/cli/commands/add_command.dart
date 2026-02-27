@@ -127,6 +127,8 @@ Future<int> runAddCommand({
     registryNamespace: preloadedNamespace,
     includeFileKindsOverride: includeFileKinds,
     excludeFileKindsOverride: excludeFileKinds,
+    enableSharedGroups: activeInstaller.enableSharedGroups,
+    enableComposites: activeInstaller.enableComposites,
   );
   final commandOrchestrator = InstallerOrchestrator(commandInstaller);
   await commandOrchestrator.ensureInitFiles();

@@ -28,6 +28,12 @@ extension MultiRegistryAddPart on MultiRegistryManager {
       if (source.directoryEntry != null) {
         config = await _upsertConfigFromDirectory(config, source.directoryEntry!);
       }
+      final supportsSharedGroups = source.configEntry?.capabilitySharedGroups ??
+          source.directoryEntry?.capabilities.sharedGroups ??
+          true;
+      final supportsComposites = source.configEntry?.capabilityComposites ??
+          source.directoryEntry?.capabilities.composites ??
+          true;
       final registry = await _loadRegistryForSource(source, projectRoot: projectRoot);
       final installer = Installer(
         registry: registry,
@@ -40,6 +46,8 @@ extension MultiRegistryAddPart on MultiRegistryManager {
         includeFileKindsOverride: includeFileKinds,
         excludeFileKindsOverride: excludeFileKinds,
         enableLegacyCoreBootstrap: false,
+        enableSharedGroups: supportsSharedGroups,
+        enableComposites: supportsComposites,
       );
       await installer.runBulkInstall(() async {
         for (final componentId in entry.value) {

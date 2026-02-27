@@ -22,6 +22,7 @@ part 'multi_registry_directory_part.dart';
 class MultiRegistryManager {
   final String targetDir;
   final bool offline;
+  final bool skipIntegrity;
   final CliLogger logger;
   final String directoryUrl;
   final String? directoryPath;
@@ -36,6 +37,7 @@ class MultiRegistryManager {
   MultiRegistryManager({
     required this.targetDir,
     required this.offline,
+    this.skipIntegrity = false,
     required this.logger,
     this.directoryUrl = defaultRegistriesDirectoryUrl,
     this.directoryPath,

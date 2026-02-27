@@ -8,6 +8,9 @@ class RegistrySummary {
   final String? baseUrl;
   final String? registryPath;
   final String? installRoot;
+  final bool? capabilitySharedGroups;
+  final bool? capabilityComposites;
+  final bool? capabilityTheme;
 
   const RegistrySummary({
     required this.namespace,
@@ -19,6 +22,9 @@ class RegistrySummary {
     required this.baseUrl,
     required this.registryPath,
     required this.installRoot,
+    required this.capabilitySharedGroups,
+    required this.capabilityComposites,
+    required this.capabilityTheme,
   });
 
   Map<String, dynamic> toJson() {
@@ -32,6 +38,9 @@ class RegistrySummary {
       'baseUrl': baseUrl,
       'registryPath': registryPath,
       'installRoot': installRoot,
+      'capabilitySharedGroups': capabilitySharedGroups,
+      'capabilityComposites': capabilityComposites,
+      'capabilityTheme': capabilityTheme,
     };
   }
 }

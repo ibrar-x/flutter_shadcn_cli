@@ -26,6 +26,7 @@ void printCliUsage() {
     MapEntry('--registry-name', 'Registry namespace (e.g. shadcn)'),
     MapEntry('--registry-path', 'Path to local registry folder'),
     MapEntry('--registry-url', 'Remote registry base URL'),
+    MapEntry('--skip-integrity', 'Skip registry SHA-256 integrity checks'),
     MapEntry('--registries-url', 'Remote registries.json URL'),
     MapEntry('--registries-path', 'Local registries.json file/directory path'),
   ]);

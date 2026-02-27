@@ -59,6 +59,9 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
         baseUrl: value.baseUrl ?? value.registryUrl,
         registryPath: value.registryPath,
         installRoot: value.installPath,
+        capabilitySharedGroups: value.capabilitySharedGroups,
+        capabilityComposites: value.capabilityComposites,
+        capabilityTheme: value.capabilityTheme,
       );
     }
 
@@ -77,6 +80,12 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
           baseUrl: existing?.baseUrl ?? entry.baseUrl,
           registryPath: existing?.registryPath,
           installRoot: existing?.installRoot ?? entry.installRoot,
+          capabilitySharedGroups:
+              existing?.capabilitySharedGroups ?? entry.capabilities.sharedGroups,
+          capabilityComposites:
+              existing?.capabilityComposites ?? entry.capabilities.composites,
+          capabilityTheme:
+              existing?.capabilityTheme ?? entry.capabilities.theme,
         );
       }
     } catch (_) {
@@ -138,6 +147,7 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
     final registry = await source.loadRegistry(
       projectRoot: projectRoot,
       offline: offline,
+      skipIntegrity: skipIntegrity,
       logger: logger,
       directoryClient: directoryClient,
     );
@@ -201,8 +211,26 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
             componentsSchemaPath:
                 existing.componentsSchemaPath ?? entry.componentsSchemaPath,
             indexPath: existing.indexPath ?? entry.indexPath,
+            indexSchemaPath:
+                existing.indexSchemaPath ?? entry.indexSchemaPath,
+            themesPath: existing.themesPath ?? entry.themesPath,
+            themesSchemaPath:
+                existing.themesSchemaPath ?? entry.themesSchemaPath,
+            folderStructurePath:
+                existing.folderStructurePath ?? entry.folderStructurePath,
+            metaPath: existing.metaPath ?? entry.metaPath,
+            themeConverterDartPath: existing.themeConverterDartPath ??
+                entry.themeConverterDartPath,
             installPath: existing.installPath ?? installRoot,
             sharedPath: existing.sharedPath ?? sharedRoot,
+            capabilitySharedGroups: existing.capabilitySharedGroups ??
+                entry.capabilities.sharedGroups,
+            capabilityComposites:
+                existing.capabilityComposites ?? entry.capabilities.composites,
+            capabilityTheme:
+                existing.capabilityTheme ?? entry.capabilities.theme,
+            trustMode: existing.trustMode ?? entry.trust.mode,
+            trustSha256: existing.trustSha256 ?? entry.trust.sha256,
             enabled: true,
           ) ??
           RegistryConfigEntry(
@@ -212,8 +240,19 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
             componentsPath: entry.componentsPath,
             componentsSchemaPath: entry.componentsSchemaPath,
             indexPath: entry.indexPath,
+            indexSchemaPath: entry.indexSchemaPath,
+            themesPath: entry.themesPath,
+            themesSchemaPath: entry.themesSchemaPath,
+            folderStructurePath: entry.folderStructurePath,
+            metaPath: entry.metaPath,
+            themeConverterDartPath: entry.themeConverterDartPath,
             installPath: installRoot,
             sharedPath: sharedRoot,
+            capabilitySharedGroups: entry.capabilities.sharedGroups,
+            capabilityComposites: entry.capabilities.composites,
+            capabilityTheme: entry.capabilities.theme,
+            trustMode: entry.trust.mode,
+            trustSha256: entry.trust.sha256,
             enabled: true,
           ),
     );

@@ -1,8 +1,39 @@
 import 'dart:io';
 
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_index_loader.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_preset_loader.dart';
+import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/registry/shared/theme/preset_theme_data.dart';
 
-Future<List<RegistryThemePresetData>> loadThemePresets() async {
+Future<List<RegistryThemePresetData>> loadThemePresets({
+  ThemeIndexLoader? themeIndexLoader,
+  ThemePresetLoader? themePresetLoader,
+  CliLogger? logger,
+}) async {
+  if (themeIndexLoader != null && themePresetLoader != null) {
+    try {
+      final rawIndex = await themeIndexLoader.load();
+      final entries = themeIndexLoader.entriesFrom(rawIndex);
+      if (entries.isNotEmpty) {
+        final presets = <RegistryThemePresetData>[];
+        for (final entry in entries) {
+          try {
+            final preset = await themePresetLoader.loadPreset(entry);
+            presets.add(preset);
+          } catch (e) {
+            logger?.warn(
+              'Skipping theme "${entry.id}" due to load error: $e',
+            );
+          }
+        }
+        if (presets.isNotEmpty) {
+          return presets;
+        }
+      }
+    } catch (e) {
+      logger?.warn('Falling back to embedded theme presets: $e');
+    }
+  }
   return registryThemePresetsData;
 }
 

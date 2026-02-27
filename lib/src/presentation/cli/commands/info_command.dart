@@ -55,6 +55,8 @@ Future<int> runInfoCommand({
     offline: offline,
     jsonOutput: infoCommand['json'] == true,
     logger: logger,
+    indexPath: selection.indexPath,
+    indexSchemaPath: selection.indexSchemaPath,
   );
   return infoExit;
 }

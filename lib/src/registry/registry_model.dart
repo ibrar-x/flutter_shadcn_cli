@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/registry/component.dart';
 import 'package:flutter_shadcn_cli/src/registry/components_schema_validator.dart';
@@ -20,6 +21,9 @@ class Registry {
     String? schemaPath,
     String? cachePath,
     String componentsPath = 'components.json',
+    String? trustMode,
+    String? trustSha256,
+    bool skipIntegrity = false,
     bool offline = false,
     CliLogger? logger,
   }) async {
@@ -48,6 +52,14 @@ class Registry {
         logger?.warn('Failed to cache components.json: $e');
       }
     }
+
+    _verifyIntegrity(
+      content: content,
+      trustMode: trustMode,
+      trustSha256: trustSha256,
+      skipIntegrity: skipIntegrity,
+      logger: logger,
+    );
 
     return fromContent(
       content: content,
@@ -123,5 +135,31 @@ class Registry {
 
   String describeSource(String relativePath) {
     return sourceRoot.describe(relativePath);
+  }
+
+  static void _verifyIntegrity({
+    required String content,
+    required String? trustMode,
+    required String? trustSha256,
+    required bool skipIntegrity,
+    required CliLogger? logger,
+  }) {
+    if (skipIntegrity) {
+      return;
+    }
+    if ((trustMode ?? '').trim().toLowerCase() != 'sha256') {
+      return;
+    }
+    final expected = trustSha256?.trim().toLowerCase();
+    if (expected == null || expected.isEmpty) {
+      return;
+    }
+    final digest = sha256.convert(utf8.encode(content)).toString().toLowerCase();
+    logger?.detail('components.json sha256: $digest');
+    if (digest != expected) {
+      throw Exception(
+        'Integrity check failed: expected $expected but received $digest',
+      );
+    }
   }
 }

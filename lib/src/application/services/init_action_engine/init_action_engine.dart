@@ -97,8 +97,11 @@ class InitActionEngine {
           writtenFiles.addAll(written);
           break;
         case 'copyDir':
-          final written =
-              await _runCopyDir(projectRoot, baseUrl: baseUrl, action: action);
+          final written = await _runCopyFiles(
+            projectRoot,
+            baseUrl: baseUrl,
+            action: action,
+          );
           filesWritten += written.length;
           writtenFiles.addAll(written);
           break;
@@ -203,11 +206,15 @@ class InitActionEngine {
     return created;
   }
 
-  Future<List<String>> _runCopyFiles(String projectRoot,
-      {required String baseUrl, required Map<String, dynamic> action}) async {
-    final files = (action['files'] as List<dynamic>? ?? const []);
+  Future<List<String>> _runCopyFiles(
+    String projectRoot, {
+    required String baseUrl,
+    required Map<String, dynamic> action,
+  }) async {
     final base = action['base']?.toString();
     final destBase = action['destBase']?.toString();
+    final fromRaw = action['from']?.toString();
+    final toRaw = action['to']?.toString();
     final overwrite = action['overwrite'] as bool? ?? false;
 
     if ((base == null) != (destBase == null)) {
@@ -216,76 +223,56 @@ class InitActionEngine {
       );
     }
 
-    final written = <String>[];
-    for (final fileEntry in files) {
-      final filePath = ResolverV1.normalizeRelativePath(fileEntry.toString());
-      final destinationRel = InitPathMapper.mapCopyFileDestination(
-        filePath: filePath,
-        base: base,
-        destBase: destBase,
-      );
-      final destinationAbs = ProjectPathGuard.resolveSafeWritePath(
-        projectRoot: projectRoot,
-        destinationRelativePath: destinationRel,
-      );
-      final destinationFile = File(destinationAbs);
-      if (destinationFile.existsSync() && !overwrite) {
-        continue;
-      }
-      if (!destinationFile.parent.existsSync()) {
-        destinationFile.parent.createSync(recursive: true);
-      }
-
-      final bytes = await _readRemoteBytes(
-        baseUrl: baseUrl,
-        relativePath: filePath,
-      );
-      await destinationFile.writeAsBytes(bytes, flush: true);
-      written.add(destinationRel);
-    }
-    return written;
-  }
-
-  Future<List<String>> _runCopyDir(String projectRoot,
-      {required String baseUrl, required Map<String, dynamic> action}) async {
-    final from =
-        ResolverV1.normalizeRelativePath(action['from']?.toString() ?? '');
-    final to = ResolverV1.normalizeRelativePath(action['to']?.toString() ?? '');
-    final base = action['base']?.toString();
-    final destBase = action['destBase']?.toString();
-    final overwrite = action['overwrite'] as bool? ?? false;
-
-    if ((base == null) != (destBase == null)) {
+    if ((fromRaw == null) != (toRaw == null)) {
       throw InitActionEngineException(
-        'copyDir requires base and destBase together',
+        'copyFiles requires from and to together when using directory mapping',
       );
     }
+    final usesDirMapping = fromRaw != null && toRaw != null;
+    final from = usesDirMapping
+        ? ResolverV1.normalizeRelativePath(fromRaw)
+        : null;
+    final to = usesDirMapping ? ResolverV1.normalizeRelativePath(toRaw) : null;
 
     final hasFiles = action['files'] is List;
     final hasIndex = action['index'] != null;
-    if (hasFiles == hasIndex) {
-      throw InitActionEngineException(
-        'copyDir requires exactly one of files[] or index',
-      );
+    if (usesDirMapping) {
+      if (hasFiles == hasIndex) {
+        throw InitActionEngineException(
+          'copyFiles with from/to requires exactly one of files[] or index',
+        );
+      }
+    } else if (!hasFiles) {
+      throw InitActionEngineException('copyFiles requires files[]');
     }
 
-    final files = hasFiles
-        ? (action['files'] as List<dynamic>).map((e) => e.toString()).toList()
-        : await _loadCopyDirIndexFiles(
-            baseUrl: baseUrl,
-            indexPath: action['index']!.toString(),
-          );
+    final files = usesDirMapping
+        ? (hasFiles
+            ? (action['files'] as List<dynamic>)
+                .map((e) => e.toString())
+                .toList()
+            : await _loadCopyDirIndexFiles(
+                baseUrl: baseUrl,
+                indexPath: action['index']!.toString(),
+              ))
+        : (action['files'] as List<dynamic>).map((e) => e.toString()).toList();
 
     final written = <String>[];
-    for (final file in files) {
-      final filePath = ResolverV1.normalizeRelativePath(file);
-      final destinationRel = InitPathMapper.mapCopyDirDestination(
-        filePath: filePath,
-        from: from,
-        to: to,
-        base: base,
-        destBase: destBase,
-      );
+    for (final fileEntry in files) {
+      final filePath = ResolverV1.normalizeRelativePath(fileEntry.toString());
+      final destinationRel = usesDirMapping
+          ? InitPathMapper.mapCopyDirDestination(
+              filePath: filePath,
+              from: from!,
+              to: to!,
+              base: base,
+              destBase: destBase,
+            )
+          : InitPathMapper.mapCopyFileDestination(
+              filePath: filePath,
+              base: base,
+              destBase: destBase,
+            );
       final destinationAbs = ProjectPathGuard.resolveSafeWritePath(
         projectRoot: projectRoot,
         destinationRelativePath: destinationRel,
@@ -297,6 +284,7 @@ class InitActionEngine {
       if (!destinationFile.parent.existsSync()) {
         destinationFile.parent.createSync(recursive: true);
       }
+
       final bytes = await _readRemoteBytes(
         baseUrl: baseUrl,
         relativePath: filePath,

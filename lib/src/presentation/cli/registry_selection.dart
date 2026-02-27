@@ -14,6 +14,16 @@ class RegistrySelection {
   final RegistryLocation sourceRoot;
   final String componentsPath;
   final String? schemaPath;
+  final String indexPath;
+  final String? indexSchemaPath;
+  final String? themesPath;
+  final String? themesSchemaPath;
+  final String? themeConverterDartPath;
+  final bool? capabilitySharedGroups;
+  final bool? capabilityComposites;
+  final bool? capabilityTheme;
+  final String? trustMode;
+  final String? trustSha256;
 
   const RegistrySelection({
     required this.mode,
@@ -22,6 +32,16 @@ class RegistrySelection {
     required this.sourceRoot,
     this.componentsPath = 'components.json',
     this.schemaPath,
+    this.indexPath = 'index.json',
+    this.indexSchemaPath,
+    this.themesPath,
+    this.themesSchemaPath,
+    this.themeConverterDartPath,
+    this.capabilitySharedGroups,
+    this.capabilityComposites,
+    this.capabilityTheme,
+    this.trustMode,
+    this.trustSha256,
   });
 }
 
@@ -58,6 +78,16 @@ RegistrySelection resolveRegistrySelection(
       config.registryUrl;
   final componentsPath = selectedEntry?.componentsPath ?? 'components.json';
   final schemaPath = selectedEntry?.componentsSchemaPath;
+  final indexPath = selectedEntry?.indexPath ?? 'index.json';
+  final indexSchemaPath = selectedEntry?.indexSchemaPath;
+  final themesPath = selectedEntry?.themesPath;
+  final themesSchemaPath = selectedEntry?.themesSchemaPath;
+  final themeConverterDartPath = selectedEntry?.themeConverterDartPath;
+  final capabilitySharedGroups = selectedEntry?.capabilitySharedGroups;
+  final capabilityComposites = selectedEntry?.capabilityComposites;
+  final capabilityTheme = selectedEntry?.capabilityTheme;
+  final trustMode = selectedEntry?.trustMode;
+  final trustSha256 = selectedEntry?.trustSha256;
 
   if (mode == 'local' || mode == 'auto') {
     var localRoot = resolveLocalRoot(
@@ -76,6 +106,16 @@ RegistrySelection resolveRegistrySelection(
         sourceRoot: RegistryLocation.local(sourceRoot, offline: offline),
         componentsPath: componentsPath,
         schemaPath: schemaPath,
+        indexPath: indexPath,
+        indexSchemaPath: indexSchemaPath,
+        themesPath: themesPath,
+        themesSchemaPath: themesSchemaPath,
+        themeConverterDartPath: themeConverterDartPath,
+        capabilitySharedGroups: capabilitySharedGroups,
+        capabilityComposites: capabilityComposites,
+        capabilityTheme: capabilityTheme,
+        trustMode: trustMode,
+        trustSha256: trustSha256,
       );
     }
     if (mode == 'local') {
@@ -95,6 +135,16 @@ RegistrySelection resolveRegistrySelection(
       sourceRoot: RegistryLocation.remote(remoteBase, offline: offline),
       componentsPath: componentsPath,
       schemaPath: schemaPath,
+      indexPath: indexPath,
+      indexSchemaPath: indexSchemaPath,
+      themesPath: themesPath,
+      themesSchemaPath: themesSchemaPath,
+      themeConverterDartPath: themeConverterDartPath,
+      capabilitySharedGroups: capabilitySharedGroups,
+      capabilityComposites: capabilityComposites,
+      capabilityTheme: capabilityTheme,
+      trustMode: trustMode,
+      trustSha256: trustSha256,
     );
   }
   final remoteRoots = _resolveRemoteRoots(remoteBase);
@@ -105,6 +155,16 @@ RegistrySelection resolveRegistrySelection(
     sourceRoot: RegistryLocation.remote(remoteRoots.sourceRoot, offline: offline),
     componentsPath: componentsPath,
     schemaPath: schemaPath,
+    indexPath: indexPath,
+    indexSchemaPath: indexSchemaPath,
+    themesPath: themesPath,
+    themesSchemaPath: themesSchemaPath,
+    themeConverterDartPath: themeConverterDartPath,
+    capabilitySharedGroups: capabilitySharedGroups,
+    capabilityComposites: capabilityComposites,
+    capabilityTheme: capabilityTheme,
+    trustMode: trustMode,
+    trustSha256: trustSha256,
   );
 }
 
@@ -175,7 +235,7 @@ Future<String> readComponentsJson(
     }
     return cacheFile.readAsString();
   }
-  return selection.registryRoot.readString('components.json');
+  return selection.registryRoot.readString(selection.componentsPath);
 }
 
 String sanitizeCacheKey(String value) {

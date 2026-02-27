@@ -51,6 +51,13 @@ Future<int> runRegistriesCommand({
     if (summary.registryPath != null && summary.registryPath!.isNotEmpty) {
       print('    path: ${summary.registryPath}');
     }
+    if (summary.capabilitySharedGroups != null ||
+        summary.capabilityComposites != null ||
+        summary.capabilityTheme != null) {
+      print(
+        '    capabilities: sharedGroups=${summary.capabilitySharedGroups ?? false}, composites=${summary.capabilityComposites ?? false}, theme=${summary.capabilityTheme ?? false}',
+      );
+    }
   }
   return ExitCodes.success;
 }

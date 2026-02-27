@@ -138,12 +138,16 @@ Future<RegistryBootstrapSelection?> preloadRegistryIfNeeded({
     namespaceOverride: namespaceOverride,
   );
   final cachePath = componentsJsonCachePath(selection.registryRoot);
+  final skipIntegrity = argResults['skip-integrity'] == true;
   try {
     final registry = await Registry.load(
       registryRoot: selection.registryRoot,
       sourceRoot: selection.sourceRoot,
       schemaPath: selection.schemaPath,
       componentsPath: selection.componentsPath,
+      trustMode: selection.trustMode,
+      trustSha256: selection.trustSha256,
+      skipIntegrity: skipIntegrity,
       cachePath: cachePath,
       offline: offline,
       logger: logger,

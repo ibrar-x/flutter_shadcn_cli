@@ -78,6 +78,7 @@ Future<void> runCliBootstrap(List<String> arguments) async {
   final multiRegistry = MultiRegistryManager(
     targetDir: targetDir,
     offline: offline,
+    skipIntegrity: argResults['skip-integrity'] == true,
     logger: logger,
     directoryUrl: registriesUrl?.isNotEmpty == true
         ? registriesUrl!
@@ -189,6 +190,10 @@ Future<void> runCliBootstrap(List<String> arguments) async {
             targetDir: targetDir,
             logger: logger,
             registryNamespace: preloadedSelection?.namespace,
+            enableSharedGroups:
+                preloadedSelection?.capabilitySharedGroups ?? true,
+            enableComposites:
+                preloadedSelection?.capabilityComposites ?? true,
           );
 
     final command = argResults.command!;
@@ -218,6 +223,7 @@ Future<void> runCliBootstrap(List<String> arguments) async {
             themeCommand: command,
             rootArgs: argResults,
             installer: installer,
+            registrySupportsTheme: preloadedSelection?.capabilityTheme,
           ),
       'add': () => runAddCommand(
             addCommand: command,

@@ -47,6 +47,7 @@ class RegistrySource {
   Future<Registry> loadRegistry({
     required String projectRoot,
     required bool offline,
+    required bool skipIntegrity,
     required CliLogger logger,
     required RegistryDirectoryClient directoryClient,
   }) async {
@@ -55,6 +56,7 @@ class RegistrySource {
         projectRoot: projectRoot,
         registry: directoryEntry!,
         offline: offline,
+        skipIntegrity: skipIntegrity,
         logger: logger,
       );
       final root =
@@ -86,6 +88,9 @@ class RegistrySource {
         sourceRoot: RegistryLocation.local(p.dirname(localRoot)),
         componentsPath: entry.componentsPath ?? 'components.json',
         schemaPath: entry.componentsSchemaPath,
+        trustMode: entry.trustMode,
+        trustSha256: entry.trustSha256,
+        skipIntegrity: skipIntegrity,
         logger: logger,
       );
     }
@@ -101,6 +106,9 @@ class RegistrySource {
       sourceRoot: RegistryLocation.remote(remoteRoot, offline: offline),
       componentsPath: entry.componentsPath ?? 'components.json',
       schemaPath: entry.componentsSchemaPath,
+      trustMode: entry.trustMode,
+      trustSha256: entry.trustSha256,
+      skipIntegrity: skipIntegrity,
       cachePath: p.join(
         projectRoot,
         '.shadcn',

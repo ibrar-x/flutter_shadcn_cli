@@ -55,6 +55,8 @@ extension MultiRegistryInitPart on MultiRegistryManager {
             namespace: directoryEntry.namespace,
             installRoot: directoryEntry.installRoot,
             paths: directoryEntry.paths,
+            capabilities: directoryEntry.capabilities,
+            trust: directoryEntry.trust,
             init: directoryEntry.init,
             raw: directoryEntry.raw,
           )

@@ -21,6 +21,11 @@ ArgParser buildCliParser() {
     )
     ..addOption('registry-path', help: 'Path to local registry folder')
     ..addOption('registry-url', help: 'Remote registry base URL (repo root)')
+    ..addFlag(
+      'skip-integrity',
+      negatable: false,
+      help: 'Skip registry SHA-256 integrity verification (development only)',
+    )
     ..addOption(
       'registries-url',
       help: 'Remote registries.json directory URL for multi-registry mode',
@@ -61,6 +66,7 @@ ArgParser buildCliParser() {
       'theme',
       ArgParser()
         ..addFlag('list', negatable: false)
+        ..addFlag('refresh', negatable: false, help: 'Refresh cache')
         ..addOption('apply', abbr: 'a')
         ..addOption('apply-file', help: 'Apply theme from local JSON file')
         ..addOption('apply-url', help: 'Apply theme from JSON URL')

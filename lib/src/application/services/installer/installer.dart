@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:flutter_shadcn_cli/src/registry.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_index_loader.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_preset_loader.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/theme_css.dart';
 import 'package:flutter_shadcn_cli/src/state.dart';
@@ -40,6 +42,8 @@ class Installer {
   final Set<String>? includeFileKindsOverride;
   final Set<String>? excludeFileKindsOverride;
   final bool enableLegacyCoreBootstrap;
+  final bool enableSharedGroups;
+  final bool enableComposites;
   Set<String>? _installedComponentCache;
   final Set<String> _installingComponentIds = {};
   final Set<String> _installingSharedIds = {};
@@ -67,6 +71,8 @@ class Installer {
     this.includeFileKindsOverride,
     this.excludeFileKindsOverride,
     this.enableLegacyCoreBootstrap = true,
+    this.enableSharedGroups = true,
+    this.enableComposites = true,
   }) : logger = logger ?? CliLogger();
 
   Future<void> init({
@@ -228,8 +234,10 @@ class Installer {
         }
       }
 
-      for (final sharedId in component.shared) {
-        await installShared(sharedId);
+      if (enableSharedGroups) {
+        for (final sharedId in component.shared) {
+          await installShared(sharedId);
+        }
       }
 
       await _installComponentFiles(component);

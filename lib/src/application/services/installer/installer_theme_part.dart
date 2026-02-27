@@ -5,12 +5,15 @@ extension InstallerThemePart on Installer {
     await _interactiveThemeSelection(skipIfConfigured: true);
   }
 
-  Future<void> chooseTheme() async {
-    await _interactiveThemeSelection(skipIfConfigured: false);
+  Future<void> chooseTheme({bool refresh = false}) async {
+    await _interactiveThemeSelection(
+      skipIfConfigured: false,
+      refresh: refresh,
+    );
   }
 
-  Future<void> listThemes() async {
-    final presets = await loadThemePresets();
+  Future<void> listThemes({bool refresh = false}) async {
+    final presets = await _loadResolvedThemePresets(refresh: refresh);
     if (presets.isEmpty) {
       logger.info('No theme presets available.');
       return;
@@ -25,8 +28,8 @@ extension InstallerThemePart on Installer {
     }
   }
 
-  Future<void> applyThemeById(String identifier) async {
-    final presets = await loadThemePresets();
+  Future<void> applyThemeById(String identifier, {bool refresh = false}) async {
+    final presets = await _loadResolvedThemePresets(refresh: refresh);
     if (presets.isEmpty) {
       logger.info('No theme presets available.');
       return;
@@ -137,8 +140,11 @@ extension InstallerThemePart on Installer {
     return result;
   }
 
-  Future<void> _interactiveThemeSelection({required bool skipIfConfigured}) async {
-    final presets = await loadThemePresets();
+  Future<void> _interactiveThemeSelection({
+    required bool skipIfConfigured,
+    bool refresh = false,
+  }) async {
+    final presets = await _loadResolvedThemePresets(refresh: refresh);
     if (presets.isEmpty) {
       return;
     }
@@ -175,6 +181,55 @@ extension InstallerThemePart on Installer {
       return;
     }
     await _applyThemePreset(chosen);
+  }
+
+  Future<List<RegistryThemePresetData>> _loadResolvedThemePresets({
+    bool refresh = false,
+  }) async {
+    await _ensureConfigLoaded();
+    final config = _cachedConfig ?? const ShadcnConfig();
+    final entry = config.registryConfig(registryNamespace);
+    final themesPath = entry?.themesPath;
+
+    if (themesPath == null || themesPath.trim().isEmpty) {
+      return loadThemePresets(logger: logger);
+    }
+
+    final registryBaseUrl =
+        entry?.baseUrl ?? entry?.registryUrl ?? registry.sourceRoot.root;
+    final registryId = _themeRegistryId(registryBaseUrl);
+    final indexLoader = ThemeIndexLoader(
+      registryId: registryId,
+      registryBaseUrl: registryBaseUrl,
+      themesPath: themesPath,
+      themesSchemaPath: entry?.themesSchemaPath,
+      refresh: refresh,
+      offline: registry.sourceRoot.offline,
+      logger: logger,
+    );
+    final presetLoader = ThemePresetLoader(
+      registryId: registryId,
+      registryBaseUrl: registryBaseUrl,
+      themesPath: themesPath,
+      themesSchemaPath: entry?.themesSchemaPath,
+      themeConverterDartPath: entry?.themeConverterDartPath,
+      refresh: refresh,
+      offline: registry.sourceRoot.offline,
+      logger: logger,
+    );
+    return loadThemePresets(
+      themeIndexLoader: indexLoader,
+      themePresetLoader: presetLoader,
+      logger: logger,
+    );
+  }
+
+  String _themeRegistryId(String registryBaseUrl) {
+    final safe = registryBaseUrl.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    if (safe.length <= 80) {
+      return safe;
+    }
+    return safe.substring(0, 80);
   }
 
   Future<void> _applyThemePreset(RegistryThemePresetData preset) async {

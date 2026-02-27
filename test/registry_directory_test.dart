@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_shadcn_cli/src/registry_directory.dart';
 import 'package:test/test.dart';
 
@@ -141,6 +142,8 @@ void main() {
         namespace: 'shadcn',
         installRoot: 'lib/ui/shadcn',
         paths: {'componentsJson': 'components.json'},
+        capabilities: const RegistryCapabilities(),
+        trust: const RegistryTrust(),
         init: null,
         raw: const {},
       );
@@ -157,6 +160,89 @@ void main() {
       );
       expect(second, contains('"components"'));
       expect(sawIfNoneMatch, isTrue);
+    });
+
+    test('enforces sha256 trust mode for components.json', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final body = jsonEncode({'components': []});
+      server.listen((request) async {
+        if (request.uri.path != '/registry/components.json') {
+          request.response.statusCode = 404;
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 200;
+        request.response.write(body);
+        await request.response.close();
+      });
+
+      final digest = sha256.convert(utf8.encode(body)).toString();
+      final client = RegistryDirectoryClient();
+      final entry = RegistryDirectoryEntry(
+        id: 'secure',
+        displayName: 'Secure',
+        minCliVersion: '0.2.0',
+        baseUrl: 'http://${server.address.host}:${server.port}/registry',
+        namespace: 'secure',
+        installRoot: 'lib/ui/secure',
+        paths: {'componentsJson': 'components.json'},
+        capabilities: const RegistryCapabilities(),
+        trust: RegistryTrust(mode: 'sha256', sha256: digest),
+        init: null,
+        raw: const {},
+      );
+
+      final loaded = await client.loadComponentsJson(
+        projectRoot: tempProject.path,
+        registry: entry,
+      );
+      expect(loaded, contains('"components"'));
+    });
+
+    test('fails sha256 trust mode on digest mismatch', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final body = jsonEncode({'components': []});
+      server.listen((request) async {
+        if (request.uri.path != '/registry/components.json') {
+          request.response.statusCode = 404;
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 200;
+        request.response.write(body);
+        await request.response.close();
+      });
+
+      final client = RegistryDirectoryClient();
+      final entry = RegistryDirectoryEntry(
+        id: 'secure',
+        displayName: 'Secure',
+        minCliVersion: '0.2.0',
+        baseUrl: 'http://${server.address.host}:${server.port}/registry',
+        namespace: 'secure',
+        installRoot: 'lib/ui/secure',
+        paths: {'componentsJson': 'components.json'},
+        capabilities: const RegistryCapabilities(),
+        trust: const RegistryTrust(mode: 'sha256', sha256: 'deadbeef'),
+        init: null,
+        raw: const {},
+      );
+
+      await expectLater(
+        () => client.loadComponentsJson(
+          projectRoot: tempProject.path,
+          registry: entry,
+        ),
+        throwsA(isA<RegistryDirectoryException>()),
+      );
     });
 
     test('loads registries directory from local file path', () async {
@@ -249,6 +335,62 @@ void main() {
         ),
         throwsA(isA<RegistryDirectoryException>()),
       );
+    });
+
+    test('RegistryDirectoryEntry parses all paths/capabilities/trust getters',
+        () {
+      final entry = RegistryDirectoryEntry.fromJson({
+        'id': 'official',
+        'displayName': 'Official',
+        'minCliVersion': '0.2.0',
+        'baseUrl': 'https://example.com/kit/lib',
+        'paths': {
+          'componentsJson': 'registry/manifests/components.json',
+          'componentsSchemaJson': 'registry/manifests/components.schema.json',
+          'indexJson': 'registry/manifests/index.json',
+          'indexSchemaJson': 'registry/manifests/index.schema.json',
+          'themesJson': 'registry/manifests/theme.index.json',
+          'themesSchemaJson': 'registry/manifests/themes.index.schema.json',
+          'themeConverterDart': 'registry/manifests/theme_converter.dart',
+          'folderStructureJson': 'registry/manifests/folder_structure.json',
+          'metaJson': 'registry/manifests/meta.json',
+        },
+        'install': {'namespace': 'shadcn', 'root': 'lib/ui/shadcn'},
+        'capabilities': {
+          'sharedGroups': true,
+          'composites': true,
+          'theme': true,
+        },
+        'trust': {'mode': 'sha256', 'sha256': 'deadbeef'},
+      });
+
+      expect(entry.componentsPath, 'registry/manifests/components.json');
+      expect(
+        entry.componentsSchemaPath,
+        'registry/manifests/components.schema.json',
+      );
+      expect(entry.indexPath, 'registry/manifests/index.json');
+      expect(entry.indexSchemaPath, 'registry/manifests/index.schema.json');
+      expect(entry.themesPath, 'registry/manifests/theme.index.json');
+      expect(
+        entry.themesSchemaPath,
+        'registry/manifests/themes.index.schema.json',
+      );
+      expect(
+        entry.themeConverterDartPath,
+        'registry/manifests/theme_converter.dart',
+      );
+      expect(
+        entry.folderStructurePath,
+        'registry/manifests/folder_structure.json',
+      );
+      expect(entry.metaPath, 'registry/manifests/meta.json');
+      expect(entry.capabilities.sharedGroups, isTrue);
+      expect(entry.capabilities.composites, isTrue);
+      expect(entry.capabilities.theme, isTrue);
+      expect(entry.trust.mode, 'sha256');
+      expect(entry.trust.sha256, 'deadbeef');
+      expect(entry.trust.isSha256, isTrue);
     });
   });
 }

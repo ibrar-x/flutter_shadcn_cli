@@ -121,9 +121,11 @@ extension InstallerRemovePart on Installer {
     final installPath = _installPath(_cachedConfig);
     final componentsDir =
         Directory(p.join(targetDir, installPath, 'components'));
-    final compositesDir =
-        Directory(p.join(targetDir, installPath, 'composites'));
-    if (!componentsDir.existsSync() && !compositesDir.existsSync()) {
+    final compositesDir = enableComposites
+        ? Directory(p.join(targetDir, installPath, 'composites'))
+        : null;
+    if (!componentsDir.existsSync() &&
+        (compositesDir == null || !compositesDir.existsSync())) {
       _installedComponentCache = {};
       return _installedComponentCache!;
     }
@@ -133,7 +135,7 @@ extension InstallerRemovePart on Installer {
     if (componentsDir.existsSync()) {
       dirs.add(componentsDir);
     }
-    if (compositesDir.existsSync()) {
+    if (compositesDir != null && compositesDir.existsSync()) {
       dirs.add(compositesDir);
     }
     for (final dir in dirs) {

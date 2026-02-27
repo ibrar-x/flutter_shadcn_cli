@@ -62,6 +62,8 @@ Future<int> runSearchCommand({
       offline: offline,
       jsonOutput: searchCommand['json'] == true,
       logger: logger,
+      indexPath: selection.indexPath,
+      indexSchemaPath: selection.indexSchemaPath,
     );
     return listExit;
   }
@@ -74,6 +76,8 @@ Future<int> runSearchCommand({
     offline: offline,
     jsonOutput: searchCommand['json'] == true,
     logger: logger,
+    indexPath: selection.indexPath,
+    indexSchemaPath: selection.indexSchemaPath,
   );
   return searchExit;
 }

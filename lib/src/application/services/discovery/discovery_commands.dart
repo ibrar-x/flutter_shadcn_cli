@@ -13,6 +13,8 @@ Future<int> handleListCommand({
   required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
+  String indexPath = 'index.json',
+  String? indexSchemaPath,
 }) async {
   if (!jsonOutput) {
     logger.section('📦 Available Components');
@@ -22,8 +24,11 @@ Future<int> handleListCommand({
     final loader = IndexLoader(
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
+      indexPath: indexPath,
+      indexSchemaPath: indexSchemaPath,
       refresh: refresh,
       offline: offline,
+      logger: logger,
     );
 
     final index = await loader.load();
@@ -139,6 +144,8 @@ Future<int> handleSearchCommand({
   required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
+  String indexPath = 'index.json',
+  String? indexSchemaPath,
 }) async {
   if (query.isEmpty) {
     if (jsonOutput) {
@@ -175,8 +182,11 @@ Future<int> handleSearchCommand({
     final loader = IndexLoader(
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
+      indexPath: indexPath,
+      indexSchemaPath: indexSchemaPath,
       refresh: refresh,
       offline: offline,
+      logger: logger,
     );
 
     final index = await loader.load();
@@ -295,6 +305,8 @@ Future<int> handleInfoCommand({
   required bool offline,
   required bool jsonOutput,
   required CliLogger logger,
+  String indexPath = 'index.json',
+  String? indexSchemaPath,
 }) async {
   if (componentId.isEmpty) {
     if (jsonOutput) {
@@ -327,8 +339,11 @@ Future<int> handleInfoCommand({
     final loader = IndexLoader(
       registryId: registryId,
       registryBaseUrl: registryBaseUrl,
+      indexPath: indexPath,
+      indexSchemaPath: indexSchemaPath,
       refresh: refresh,
       offline: offline,
+      logger: logger,
     );
 
     final index = await loader.load();

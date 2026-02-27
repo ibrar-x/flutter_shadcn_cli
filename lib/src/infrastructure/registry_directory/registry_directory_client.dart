@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_shadcn_cli/src/infrastructure/registry_directory/registry_directory_entry.dart';
 import 'package:flutter_shadcn_cli/src/infrastructure/registry_directory/registry_directory_exception.dart';
 import 'package:flutter_shadcn_cli/src/infrastructure/registry_directory/registry_directory_model.dart';
@@ -109,6 +110,7 @@ class RegistryDirectoryClient {
     required String projectRoot,
     required RegistryDirectoryEntry registry,
     bool offline = false,
+    bool skipIntegrity = false,
     CliLogger? logger,
   }) async {
     final key = _sanitizeCacheKey('components_${registry.namespace}');
@@ -116,13 +118,20 @@ class RegistryDirectoryClient {
     final cacheMeta = _cacheFile(projectRoot, '$key.meta.json');
     final uri =
         ResolverV1.resolveUrl(registry.baseUrl, registry.componentsPath);
-    return _fetchWithEtag(
+    final content = await _fetchWithEtag(
       url: uri,
       bodyCacheFile: cacheBody,
       metaCacheFile: cacheMeta,
       offline: offline,
       logger: logger,
     );
+    _verifyIntegrity(
+      registry: registry,
+      body: content,
+      skipIntegrity: skipIntegrity,
+      logger: logger,
+    );
+    return content;
   }
 
   Future<String> _fetchWithEtag({
@@ -259,6 +268,31 @@ class RegistryDirectoryClient {
 
   static String _sanitizeCacheKey(String value) {
     return value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  }
+
+  void _verifyIntegrity({
+    required RegistryDirectoryEntry registry,
+    required String body,
+    required bool skipIntegrity,
+    required CliLogger? logger,
+  }) {
+    if (!registry.trust.isSha256 || skipIntegrity) {
+      return;
+    }
+    final expected = registry.trust.sha256?.trim().toLowerCase();
+    if (expected == null || expected.isEmpty) {
+      return;
+    }
+    final bytes = utf8.encode(body);
+    final digest = sha256.convert(bytes).toString().toLowerCase();
+    logger?.detail(
+      'components.json sha256 (${registry.namespace}): $digest',
+    );
+    if (digest != expected) {
+      throw RegistryDirectoryException(
+        'Integrity check failed for ${registry.namespace}: expected $expected but received $digest',
+      );
+    }
   }
 }
 

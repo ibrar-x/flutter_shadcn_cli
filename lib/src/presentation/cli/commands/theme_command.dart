@@ -8,6 +8,7 @@ Future<int> runThemeCommand({
   required ArgResults themeCommand,
   required ArgResults rootArgs,
   required Installer? installer,
+  required bool? registrySupportsTheme,
 }) async {
   final activeInstaller = installer;
   if (activeInstaller == null) {
@@ -15,10 +16,11 @@ Future<int> runThemeCommand({
     return ExitCodes.registryNotFound;
   }
   if (themeCommand['help'] == true) {
-    print('Usage: flutter_shadcn theme [--list | --apply <preset> | --apply-file <path> | --apply-url <url>]');
+    print('Usage: flutter_shadcn theme [--list | --apply <preset> | --apply-file <path> | --apply-url <url>] [--refresh]');
     print('');
     print('Options:');
     print('  --list             Show all available theme presets');
+    print('  --refresh          Refresh theme cache');
     print('  --apply, -a <id>   Apply the preset with the given ID');
     print('  --apply-file       Apply a theme JSON file (experimental)');
     print('  --apply-url        Apply a theme JSON URL (experimental)');
@@ -28,9 +30,14 @@ Future<int> runThemeCommand({
     print('  Use --experimental to enable apply-file/apply-url.');
     return ExitCodes.success;
   }
+  if (registrySupportsTheme == false) {
+    print('This registry does not provide theme presets.');
+    return ExitCodes.success;
+  }
   final isExperimental = rootArgs['experimental'] == true;
+  final refresh = themeCommand['refresh'] == true;
   if (themeCommand['list'] == true) {
-    await activeInstaller.listThemes();
+    await activeInstaller.listThemes(refresh: refresh);
     return ExitCodes.success;
   }
   final applyFile = themeCommand['apply-file'] as String?;
@@ -56,9 +63,9 @@ Future<int> runThemeCommand({
   }
   final presetArg = applyOption ?? (rest.isEmpty ? null : rest.first);
   if (presetArg != null) {
-    await activeInstaller.applyThemeById(presetArg);
+    await activeInstaller.applyThemeById(presetArg, refresh: refresh);
     return ExitCodes.success;
   }
-  await activeInstaller.chooseTheme();
+  await activeInstaller.chooseTheme(refresh: refresh);
   return ExitCodes.success;
 }

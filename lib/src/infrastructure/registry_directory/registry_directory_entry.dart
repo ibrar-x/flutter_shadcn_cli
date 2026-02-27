@@ -1,3 +1,6 @@
+import 'package:flutter_shadcn_cli/src/infrastructure/registry_directory/registry_capabilities.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry_directory/registry_trust.dart';
+
 class RegistryDirectoryEntry {
   final String id;
   final String displayName;
@@ -6,6 +9,8 @@ class RegistryDirectoryEntry {
   final String namespace;
   final String installRoot;
   final Map<String, String> paths;
+  final RegistryCapabilities capabilities;
+  final RegistryTrust trust;
   final Map<String, dynamic>? init;
   final Map<String, dynamic> raw;
 
@@ -17,6 +22,8 @@ class RegistryDirectoryEntry {
     required this.namespace,
     required this.installRoot,
     required this.paths,
+    required this.capabilities,
+    required this.trust,
     required this.init,
     required this.raw,
   });
@@ -38,6 +45,16 @@ class RegistryDirectoryEntry {
       namespace: install['namespace']?.toString() ?? '',
       installRoot: install['root']?.toString() ?? '',
       paths: paths,
+      capabilities: RegistryCapabilities.fromJson(
+        (json['capabilities'] as Map?)?.map(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+      ),
+      trust: RegistryTrust.fromJson(
+        (json['trust'] as Map?)?.map(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+      ),
       init: (json['init'] as Map?)?.map(
         (key, value) => MapEntry(key.toString(), value),
       ),
@@ -47,7 +64,13 @@ class RegistryDirectoryEntry {
 
   String get componentsPath => paths['componentsJson'] ?? 'components.json';
   String? get componentsSchemaPath => paths['componentsSchemaJson'];
-  String? get indexPath => paths['indexJson'];
+  String get indexPath => paths['indexJson'] ?? 'index.json';
+  String? get indexSchemaPath => paths['indexSchemaJson'];
+  String? get themesPath => paths['themesJson'];
+  String? get themesSchemaPath => paths['themesSchemaJson'];
+  String? get themeConverterDartPath => paths['themeConverterDart'];
+  String? get folderStructurePath => paths['folderStructureJson'];
+  String? get metaPath => paths['metaJson'];
 
   bool get hasInlineInit {
     final initMap = init;

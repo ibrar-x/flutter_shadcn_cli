@@ -6,16 +6,41 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  test('components.json validates against schema', () async {
-    final registryDir = p.join(
-      Directory.current.path,
-      '..',
-      'shadcn_flutter_kit',
-      'flutter_shadcn_kit',
-      'lib',
-      'registry',
+  Future<Directory> createSchemaFixtureDir() async {
+    final dir = await Directory.systemTemp.createTemp('schema_validation_test_');
+    final schemaFile = File(p.join(dir.path, 'components.schema.json'));
+    final componentsFile = File(p.join(dir.path, 'components.json'));
+
+    await schemaFile.writeAsString(
+      jsonEncode({
+        r'$schema': 'https://json-schema.org/draft/2020-12/schema',
+        'type': 'object',
+        'required': ['schemaVersion', 'name', 'defaults'],
+        'properties': {
+          'schemaVersion': {'type': 'integer'},
+          'name': {'type': 'string'},
+          'defaults': {'type': 'object'},
+        },
+      }),
     );
-    final registryRoot = RegistryLocation.local(registryDir);
+
+    await componentsFile.writeAsString(
+      jsonEncode({
+        r'$schema': './components.schema.json',
+        'schemaVersion': 1,
+        'name': 'fixture_registry',
+        'defaults': {'installPath': 'lib/ui/shadcn'},
+      }),
+    );
+
+    return dir;
+  }
+
+  test('components.json validates against schema', () async {
+    final fixtureDir = await createSchemaFixtureDir();
+    addTearDown(() => fixtureDir.delete(recursive: true));
+
+    final registryRoot = RegistryLocation.local(fixtureDir.path);
     final content = await registryRoot.readString('components.json');
     final data = jsonDecode(content);
     expect(data, isA<Map<String, dynamic>>());
@@ -38,15 +63,10 @@ void main() {
   });
 
   test('invalid fixture fails schema validation', () async {
-    final registryDir = p.join(
-      Directory.current.path,
-      '..',
-      'shadcn_flutter_kit',
-      'flutter_shadcn_kit',
-      'lib',
-      'registry',
-    );
-    final registryRoot = RegistryLocation.local(registryDir);
+    final fixtureDir = await createSchemaFixtureDir();
+    addTearDown(() => fixtureDir.delete(recursive: true));
+
+    final registryRoot = RegistryLocation.local(fixtureDir.path);
     final schemaSource = ComponentsSchemaValidator.resolveSchemaSource(
       data: const {},
       registryRoot: registryRoot,
@@ -54,7 +74,7 @@ void main() {
     expect(schemaSource, isNotNull);
 
     final invalid = {
-      'schemaVersion': 1,
+      'schemaVersion': '1',
       'name': 'invalid_registry',
       'defaults': {},
     };

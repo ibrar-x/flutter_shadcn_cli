@@ -60,6 +60,8 @@ Future<int> runListCommand({
     offline: offline,
     jsonOutput: listCommand['json'] == true,
     logger: logger,
+    indexPath: selection.indexPath,
+    indexSchemaPath: selection.indexSchemaPath,
   );
   return listExit;
 }
