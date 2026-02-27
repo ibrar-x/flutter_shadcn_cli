@@ -1,2 +1,2 @@
-@Deprecated('Use package:flutter_shadcn_cli/src/audit_command.dart instead.')
-export 'package:flutter_shadcn_cli/src/audit_command.dart';
+@Deprecated('Use package:flutter_shadcn_cli/src/legacy/v0_1_9/audit_command.dart instead.')
+export 'package:flutter_shadcn_cli/src/legacy/v0_1_9/audit_command.dart';

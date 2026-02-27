@@ -13,9 +13,9 @@ The `flutter_shadcn feedback` command provides a structured way for users to sub
 - 💡 **Other** - For general feedback and suggestions
 
 ✅ **Auto-filled Context**:
-- CLI version (e.g., `0.1.8`)
-- Operating system (e.g., `macOS 14.2.1`)
-- Dart SDK version (e.g., `3.3.0`)
+- CLI version (e.g., `0.2.0`)
+- Operating system (e.g., `macOS (runtime value)`)
+- Dart SDK version (e.g., `runtime Dart SDK value`)
 
 ✅ **Smart GitHub Integration**:
 - Opens pre-filled GitHub issue in default browser
@@ -104,9 +104,9 @@ flutter_shadcn feedback --help
 [What actually happens]
 
 ## Environment
-**CLI Version**: 0.1.8
-**OS**: macOS 14.2.1
-**Dart SDK**: 3.3.0
+**CLI Version**: 0.2.0
+**OS**: macOS (runtime value)
+**Dart SDK**: runtime Dart SDK value
 ```
 
 ### Feature Request Template
@@ -121,9 +121,9 @@ flutter_shadcn feedback --help
 [Other solutions you've thought about]
 
 ## Environment
-**CLI Version**: 0.1.8
-**OS**: macOS 14.2.1
-**Dart SDK**: 3.3.0
+**CLI Version**: 0.2.0
+**OS**: macOS (runtime value)
+**Dart SDK**: runtime Dart SDK value
 ```
 
 ### Documentation Template
@@ -142,7 +142,7 @@ flutter_shadcn feedback --help
 [Code snippet or example if helpful]
 
 ## Environment
-**CLI Version**: 0.1.8
+**CLI Version**: 0.2.0
 ```
 
 ### Question Template
@@ -160,7 +160,7 @@ flutter_shadcn feedback --help
 [What you expect to happen]
 
 ## Environment
-**CLI Version**: 0.1.8
+**CLI Version**: 0.2.0
 ```
 
 ### Performance Issue Template
@@ -172,9 +172,9 @@ flutter_shadcn feedback --help
 [How it affects your workflow]
 
 ## Environment
-**CLI Version**: 0.1.8
-**OS**: macOS 14.2.1
-**Dart SDK**: 3.3.0
+**CLI Version**: 0.2.0
+**OS**: macOS (runtime value)
+**Dart SDK**: runtime Dart SDK value
 **Flutter Version**: 
 
 ## Steps to Reproduce
@@ -192,7 +192,7 @@ flutter_shadcn feedback --help
 [Any other relevant information]
 
 ## Environment
-**CLI Version**: 0.1.8
+**CLI Version**: 0.2.0
 ```
 
 ## Benefits
@@ -205,7 +205,7 @@ flutter_shadcn feedback --help
 
 ## Implementation
 
-- **File**: `lib/src/feedback_manager.dart`
+- **File**: `lib/src/application/services/feedback/feedback_manager.dart`
 - **Class**: `FeedbackManager`
 - **Dependencies**: `CliLogger`, `Platform`, `Process`
 - **Integration**: Wired into `bin/shadcn.dart` main switch statement
@@ -213,6 +213,6 @@ flutter_shadcn feedback --help
 ## Documentation
 
 - ✅ README.md - Usage section added
-- ✅ CHANGELOG.md - v0.1.8 section updated
+- ✅ CHANGELOG.md - v0.2.0 section updated
 - ✅ FULL_COMMANDS_DOCS.md - Complete command documentation
 - ✅ Help text - Integrated into CLI help output

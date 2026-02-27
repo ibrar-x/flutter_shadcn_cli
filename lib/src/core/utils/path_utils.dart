@@ -1,0 +1,24 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
+bool isPathTraversal(String path) {
+  return path.contains('..') || path.contains('\\');
+}
+
+String findProjectRootFrom(String fromDir) {
+  var current = Directory(fromDir);
+  while (true) {
+    final pubspec = File(p.join(current.path, 'pubspec.yaml'));
+    if (pubspec.existsSync()) {
+      return current.path;
+    }
+    final parent = current.parent;
+    if (parent.path == current.path) {
+      throw Exception(
+        'Could not locate Flutter project root (pubspec.yaml not found).',
+      );
+    }
+    current = parent;
+  }
+}

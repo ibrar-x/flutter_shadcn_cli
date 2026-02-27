@@ -2,6 +2,11 @@
 
 `v0.2.0` is the active multi-registry system.
 
+## Documentation Tracks
+
+- User docs: [user/README.md](user/README.md)
+- Developer docs: [developer/README.md](developer/README.md)
+
 ## Core Behavior
 
 - Registry directory (`registries.json`) drives namespace discovery and inline init.

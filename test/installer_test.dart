@@ -8,6 +8,7 @@ import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/installer.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/registry.dart';
+import 'package:flutter_shadcn_cli/src/state.dart';
 
 void main() {
   group('Installer', () {
@@ -514,6 +515,125 @@ void main() {
       expect(config.sharedPath, 'lib/ui/shadcn/shared');
       expect(config.pathAliases?['ui'], 'ui');
     });
+
+    test('init auto-reuses existing config/state without prompts', () async {
+      await _writeConfig(
+        targetRoot,
+        const ShadcnConfig(
+          installPath: 'lib/ui/custom',
+          sharedPath: 'lib/ui/custom/shared',
+          includeReadme: false,
+          includeMeta: true,
+          includePreview: false,
+          defaultNamespace: 'shadcn',
+          registries: {
+            'shadcn': RegistryConfigEntry(
+              installPath: 'lib/ui/custom',
+              sharedPath: 'lib/ui/custom/shared',
+              includeReadme: false,
+              includeMeta: true,
+              includePreview: false,
+              enabled: true,
+            ),
+          },
+        ),
+      );
+      await ShadcnState.save(
+        targetRoot.path,
+        const ShadcnState(
+          installPath: 'lib/ui/custom',
+          sharedPath: 'lib/ui/custom/shared',
+          registries: {
+            'shadcn': RegistryStateEntry(
+              installPath: 'lib/ui/custom',
+              sharedPath: 'lib/ui/custom/shared',
+            ),
+          },
+        ),
+      );
+      _writePubspec(targetRoot);
+
+      final registry = await Registry.load(
+        registryRoot: RegistryLocation.local(registryRoot.path),
+        sourceRoot: RegistryLocation.local(p.dirname(registryRoot.path)),
+      );
+      final installer = Installer(
+        registry: registry,
+        targetDir: targetRoot.path,
+        logger: CliLogger(),
+      );
+
+      await installer.init();
+
+      expect(
+        File(
+          p.join(
+            targetRoot.path,
+            'lib',
+            'ui',
+            'custom',
+            'shared',
+            'theme',
+            'theme.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          p.join(
+            targetRoot.path,
+            '.shadcn',
+            'config.json',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
+    test('applies theme against v1 color_schemes.dart layout', () async {
+      await _writeConfig(
+        targetRoot,
+        const ShadcnConfig(
+          installPath: 'lib/ui/shadcn',
+          sharedPath: 'lib/ui/shadcn/shared',
+          includeReadme: false,
+          includeMeta: true,
+          includePreview: false,
+        ),
+      );
+      _writePubspec(targetRoot);
+
+      final registry = await Registry.load(
+        registryRoot: RegistryLocation.local(registryRoot.path),
+        sourceRoot: RegistryLocation.local(p.dirname(registryRoot.path)),
+      );
+      final installer = Installer(
+        registry: registry,
+        targetDir: targetRoot.path,
+        logger: CliLogger(),
+      );
+
+      await installer.init(skipPrompts: true);
+      await installer.applyThemeById('modern-minimal');
+
+      final colorSchemesFile = File(
+        p.join(
+          targetRoot.path,
+          'lib',
+          'ui',
+          'shadcn',
+          'shared',
+          'theme',
+          '_impl',
+          'core',
+          'color_schemes.dart',
+        ),
+      );
+      expect(colorSchemesFile.existsSync(), isTrue);
+      final config = await ShadcnConfig.load(targetRoot.path);
+      expect(config.themeId, 'modern-minimal');
+    });
   });
 }
 
@@ -526,6 +646,9 @@ void _writeRegistryFixtures(Directory registryRoot) {
     ..createSync(recursive: true);
   final sharedThemeDir = Directory(p.join(root, 'registry', 'shared', 'theme'))
     ..createSync(recursive: true);
+  final sharedThemeImplCoreDir =
+      Directory(p.join(root, 'registry', 'shared', 'theme', '_impl', 'core'))
+        ..createSync(recursive: true);
   final sharedUtilDir = Directory(p.join(root, 'registry', 'shared', 'util'))
     ..createSync(recursive: true);
   final sharedColorExtensionsDir =
@@ -555,6 +678,38 @@ void _writeRegistryFixtures(Directory registryRoot) {
 
   File(p.join(sharedThemeDir.path, 'theme.dart'))
       .writeAsStringSync('class ThemeHelper {}');
+  File(p.join(sharedThemeImplCoreDir.path, 'color_schemes.dart'))
+      .writeAsStringSync(
+    '''
+import 'package:flutter/material.dart';
+
+class ColorSchemes {
+  static const ColorScheme lightDefaultColor = ColorScheme(
+    brightness: Brightness.light,
+    primary: Color(0xFF111111),
+    onPrimary: Color(0xFFFFFFFF),
+    secondary: Color(0xFF222222),
+    onSecondary: Color(0xFFFFFFFF),
+    error: Color(0xFFBA1A1A),
+    onError: Color(0xFFFFFFFF),
+    surface: Color(0xFFFFFFFF),
+    onSurface: Color(0xFF111111),
+  );
+
+  static const ColorScheme darkDefaultColor = ColorScheme(
+    brightness: Brightness.dark,
+    primary: Color(0xFFEEEEEE),
+    onPrimary: Color(0xFF111111),
+    secondary: Color(0xFFDDDDDD),
+    onSecondary: Color(0xFF111111),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    surface: Color(0xFF111111),
+    onSurface: Color(0xFFEEEEEE),
+  );
+}
+''',
+  );
   File(p.join(sharedUtilDir.path, 'util.dart'))
       .writeAsStringSync('class UtilHelper {}');
   File(p.join(sharedColorExtensionsDir.path, 'color_extensions.dart'))
@@ -576,6 +731,10 @@ void _writeRegistryFixtures(Directory registryRoot) {
           {
             'source': 'registry/shared/theme/theme.dart',
             'destination': '{sharedPath}/theme/theme.dart'
+          },
+          {
+            'source': 'registry/shared/theme/_impl/core/color_schemes.dart',
+            'destination': '{sharedPath}/theme/_impl/core/color_schemes.dart'
           }
         ]
       },

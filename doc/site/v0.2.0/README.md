@@ -7,6 +7,8 @@ Current system documentation for the multi-registry architecture.
 - [Overview](overview.md)
 - [Getting Started](getting-started.md)
 - [Core Concepts](concepts.md)
+- [User Docs Hub](user/README.md)
+- [Developer Docs Hub](developer/README.md)
 - [Command Reference](commands/index.md)
 - [Registry and Schema](registry/index.md)
 - [Internals and Architecture](internals/architecture.md)

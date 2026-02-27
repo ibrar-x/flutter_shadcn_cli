@@ -952,7 +952,7 @@ flutter_shadcn version --check
 
 ### Why These Files
 
-- **Embedded version**: The current version (0.1.8) is hardcoded in `version_manager.dart` as a constant, ensuring the CLI always knows its own version without external dependencies.
+- **Embedded version**: The current version (0.2.0) is hardcoded in `version_manager.dart` as a constant, ensuring the CLI always knows its own version without external dependencies.
 - **pub.dev API**: Official source of truth for latest published version; using the API ensures accurate, real-time version information.
 
 ---
@@ -1013,7 +1013,7 @@ The CLI automatically checks for updates on every command execution (excluding `
   "lastCheck": "2026-02-04T10:30:00.000Z",
   "hasUpdate": true,
   "latestVersion": "0.1.9",
-  "currentVersion": "0.1.8"
+  "currentVersion": "0.2.0"
 }
 ```
 
@@ -1111,9 +1111,9 @@ flutter_shadcn feedback --help
    - Title and body populated from user input
    - Environment section auto-filled:
      ```
-     **CLI Version**: 0.1.8
-     **OS**: macOS 14.2.1
-     **Dart SDK**: 3.3.0
+     **CLI Version**: 0.2.0
+     **OS**: macOS (runtime value)
+     **Dart SDK**: runtime Dart SDK value
      ```
    - Labels automatically applied
    - User can edit before submitting

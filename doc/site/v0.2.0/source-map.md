@@ -14,7 +14,7 @@ No headings found.
     - **📦 Install Manifests**: - **NEW**: Per-component install manifests at `.shadcn/components/<id>.json` (version/tags + audit data). - **IMPROVED**: `<installPath>/components.json` now stores component metadata (version/tags).
     - **🧰 Init & Install**: - **CHANGED**: `init --add` removed; pass components positionally (e.g., `flutter_shadcn init button dialog`). - **IMPROVED**: Shared dependency closure for init/shared installs, plus cross-registry file dependency resolution.
     - **🧪 Tests**: - **NEW**: Integration tests validating CLI install behavior and schema validation.
-  - **0.1.8**: Section content describes this topic.
+  - **0.2.0**: Section content describes this topic.
     - **🎯 Component Discovery**: - **NEW**: Component discovery system with `list`, `search`, and `info` commands. - Browse components by category with `list` - Search with relevance scoring via `search <query>` - View detailed component info with `info <component-id>` - **NEW**: Intelligent index.json caching (24-hour staleness policy). - Cache location: `~/.flutter_shadcn/cache/{registryId}/index.json` - Local index.json support with remote fallback - Use `--refresh` flag to force cache update from remote
     - **🤖 AI Skills Management**: - **NEW**: Interactive multi-skill, multi-model AI skills manager with `install-skill` command. - **Default multi-skill interactive mode** - just run `flutter_shadcn install-skill` (no flags needed, see what's already installed) - Auto-discovers 28+ AI model folders (`.claude`, `.cursor`, `.gemini`, `.gpt4`, `.codex`, `.deepseek`, `.ollama`, etc.) - **Shows human-readable model names** (e.g., "Cursor", "Claude (Anthropic)", "OpenAI (Codex)", "Google Gemini") - **Intelligent duplicate detection**: Checks which models already have selected skills - Offers 3 options when skills exist: skip installed, overwrite all, or cancel - Only installs to models without the skill (smart selection) - **Context-aware installation modes**: - Detects existing installations automatically - When 2+ models selected: offers copy-per-model or install+symlink (saves disk space) - Detects existing installations and offers them as symlink sources - Only shows relevant options based on what's already installed - **Multi-model selection**: Pick individual models or "all models" option - **Only creates selected model folders** on demand (no template clutter) - Smart default selection: primary model + symlinks to others when space-saving makes sense - **NEW**: skills.json discovery index (mirrors components.json pattern). - List available skills: `flutter_shadcn install-skill --available` - Install single skill: `flutter_shadcn install-skill --skill <id>` - Install to specific model: `flutter_shadcn install-skill --skill <id> --model <name>` - **Multi-location skill discovery**: Local kit registry → parent directories → project root (auto-fallback) - Custom registry: `--skills-url /path/or/url` - **Requires `skill.json` or `skill.yaml` manifest** for installation (throws helpful error if missing) - Copies AI-focused docs: SKILL.md, INSTALLATION.md, references/{commands,examples}.md - Management files (skill.json, skill.yaml, schemas.md) stay in registry (CLI-only) - **NEW**: Interactive skill removal with `--uninstall-interactive`. - Menu-driven selection: choose which skills to remove - Model selection: remove from specific models or all models - Shows installation count per skill - Confirmation before removal - Graceful error handling for missing/already-deleted folders - **IMPROVED**: Symlink handling for safe removal. - Auto-detects symlinks vs real directories - Removes only the symlink, preserves source files - Resolves symlink targets before deletion (prevents corruption) - Handles broken symlinks gracefully - Batch removal: safely removes from multiple models even if some don't have the skill
     - **🔧 Project Management Commands**: - **NEW**: Dry-run command to preview component installs (deps, shared, assets, fonts, platform changes). - **NEW**: Doctor validates components.json against components.schema.json and reports cache paths.
@@ -61,36 +61,36 @@ No headings found.
   - **Steps to Reproduce**: 1. 2. 3.
   - **Expected Behavior**: [What should happen]
   - **Actual Behavior**: [What actually happens]
-  - **Environment**: **CLI Version**: 0.1.8 **OS**: macOS 14.2.1 **Dart SDK**: 3.3.0
+  - **Environment**: **CLI Version**: 0.2.0 **OS**: macOS (runtime value) **Dart SDK**: runtime Dart SDK value
     - **Feature Request Template**: Section content describes this topic.
   - **Problem Statement**: [User's description]
   - **Proposed Solution**: [How you'd like it to work]
   - **Alternatives Considered**: [Other solutions you've thought about]
-  - **Environment**: **CLI Version**: 0.1.8 **OS**: macOS 14.2.1 **Dart SDK**: 3.3.0
+  - **Environment**: **CLI Version**: 0.2.0 **OS**: macOS (runtime value) **Dart SDK**: runtime Dart SDK value
     - **Documentation Template**: Section content describes this topic.
   - **Documentation Issue**: [User's description]
   - **Location**: **Page/Section**: [Where in the docs] **URL**: [Link if applicable]
   - **Suggested Improvement**: [What should be changed or added]
   - **Example**: [Code snippet or example if helpful]
-  - **Environment**: **CLI Version**: 0.1.8
+  - **Environment**: **CLI Version**: 0.2.0
     - **Question Template**: Section content describes this topic.
   - **Question**: [User's description]
   - **Context**: [What you're trying to accomplish]
   - **What I've Tried**: [Steps or solutions you've attempted]
   - **Expected Outcome**: [What you expect to happen]
-  - **Environment**: **CLI Version**: 0.1.8
+  - **Environment**: **CLI Version**: 0.2.0
     - **Performance Issue Template**: Section content describes this topic.
   - **Performance Issue**: [User's description]
   - **Impact**: [How it affects your workflow]
-  - **Environment**: **CLI Version**: 0.1.8 **OS**: macOS 14.2.1 **Dart SDK**: 3.3.0 **Flutter Version**:
+  - **Environment**: **CLI Version**: 0.2.0 **OS**: macOS (runtime value) **Dart SDK**: runtime Dart SDK value **Flutter Version**:
   - **Steps to Reproduce**: 1. 2. 3.
     - **Other Feedback Template**: Section content describes this topic.
   - **Feedback**: [User's description]
   - **Additional Context**: [Any other relevant information]
-  - **Environment**: **CLI Version**: 0.1.8
+  - **Environment**: **CLI Version**: 0.2.0
   - **Benefits**: 1. **Structured**: Templates ensure all necessary information is collected 2. **Time-saving**: Auto-fills environment details users might forget 3. **Better triage**: Labels help maintainers prioritize and route issues 4. **Lower barrier**: Simple interactive flow encourages user feedback 5. **Context-rich**: Version and platform info aids debugging
-  - **Implementation**: - **File**: `lib/src/feedback_manager.dart` - **Class**: `FeedbackManager` - **Dependencies**: `CliLogger`, `Platform`, `Process` - **Integration**: Wired into `bin/shadcn.dart` main switch statement
-  - **Documentation**: - ✅ README.md - Usage section added - ✅ CHANGELOG.md - v0.1.8 section updated - ✅ FULL_COMMANDS_DOCS.md - Complete command documentation - ✅ Help text - Integrated into CLI help output
+  - **Implementation**: - **File**: `lib/src/application/services/feedback/feedback_manager.dart` - **Class**: `FeedbackManager` - **Dependencies**: `CliLogger`, `Platform`, `Process` - **Integration**: Wired into `bin/shadcn.dart` main switch statement
+  - **Documentation**: - ✅ README.md - Usage section added - ✅ CHANGELOG.md - v0.2.0 section updated - ✅ FULL_COMMANDS_DOCS.md - Complete command documentation - ✅ Help text - Integrated into CLI help output
 
 ## shadcn_flutter_cli/README.md
 
@@ -326,7 +326,7 @@ No headings found.
 - **Show current version**: flutter_shadcn version
 - **Check for available updates**: flutter_shadcn version --check
     - **Files Used**: | File Path | Purpose | Why | |-----------|---------|-----| | `pubspec.yaml` (embedded) | Current version source | Version number is compiled into the CLI binary | | `https://pub.dev/api/packages/flutter_shadcn_cli` | Latest version API | Queries pub.dev REST API to fetch latest published version |
-    - **Why These Files**: - **Embedded version**: The current version (0.1.8) is hardcoded in `version_manager.dart` as a constant, ensuring the CLI always knows its own version without external dependencies. - **pub.dev API**: Official source of truth for latest published version; using the API ensures accurate, real-time version information.
+    - **Why These Files**: - **Embedded version**: The current version (0.2.0) is hardcoded in `version_manager.dart` as a constant, ensuring the CLI always knows its own version without external dependencies. - **pub.dev API**: Official source of truth for latest published version; using the API ensures accurate, real-time version information.
   - **upgrade**: Section content describes this topic.
     - **What it does**: Upgrades the CLI to the latest version published on pub.dev. Automates the update process with a single command, eliminating manual steps.
 - **Upgrade to latest version**: flutter_shadcn upgrade
@@ -479,7 +479,7 @@ No headings found.
     - **Local Registry Search**: Searches in order: 1. `shadcn_flutter_kit/flutter_shadcn_kit/skills/{skillId}` 2. Parent directories for `skills/{skillId}` 3. Project root `skills/{skillId}` 4. Falls back to placeholder
     - **Model Folder Discovery**: - Lists all directories starting with `.` in project root - Filters out `.git`, `.dart_tool`, etc. - Merges with template list of known AI assistants - Auto-creates missing folders
   - **Related Commands**: - `flutter_shadcn init` - Initialize project (run before installing skills) - `flutter_shadcn add <component>` - Install components (uses skill knowledge) - `flutter_shadcn doctor` - Diagnose setup issues
-  - **Version History**: - **v0.1.8**: Added install-skill command with auto-discovery and symlink support - **v0.1.9**: Enhanced local registry detection and file copying
+  - **Version History**: - **v0.2.0**: Added install-skill command with auto-discovery and symlink support - **v0.1.9**: Enhanced local registry detection and file copying
   - **See Also**: - [cli-skill-command.md](./cli-skill-command.md) - Detailed implementation guide - [FULL_COMMANDS_DOCS.md](./FULL_COMMANDS_DOCS.md) - All CLI commands - [SKILL.md](../shadcn_flutter_kit/flutter_shadcn_kit/skills/flutter-shadcn-ui/SKILL.md) - The actual skill content
 
 ## shadcn_flutter_cli/doc/SKILL_COMMAND_IMPLEMENTATION.md
@@ -546,7 +546,7 @@ No headings found.
     - **Fixtures**: Tests create minimal fixtures as needed: - Skill manifests (skill.json) - Skill files (SKILL.md, INSTALLATION.md, etc.) - Model folders (.claude, .cursor, etc.) - Cache files (version_check.json)
   - **Test Patterns**: Section content describes this topic.
     - **Skill Manager Tests**: // Create skill in local kit registry final skillDir = Directory(p.join(skillsRoot.path, 'flutter-shadcn-ui')) ..createSync(recursive: true);
-    - **Version Manager Tests**: // Test version comparison expect(_isNewerVersion('0.1.9', '0.1.8'), isTrue); expect(_isNewerVersion('0.1.8', '0.1.8'), isFalse);
+    - **Version Manager Tests**: // Test version comparison expect(_isNewerVersion('0.1.9', '0.2.0'), isTrue); expect(_isNewerVersion('0.2.0', '0.2.0'), isFalse);
   - **CI/CD Integration**: These tests are designed to run in CI/CD pipelines: - No external dependencies (network calls are mocked/stubbed) - Fast execution (all tests run in < 5 seconds) - Deterministic results (no flaky tests) - Clean teardown (no leftover temp files)
   - **Coverage Goals**: Current coverage: - **Skill Manager**: ~85% (core logic fully covered) - **Version Manager**: ~80% (version comparison and cache logic covered) - **Config**: ~90% (serialization fully covered) - **Installer**: ~75% (component installation covered)
   - **Future Test Additions**: Planned tests: - [ ] Integration tests for full CLI workflows - [ ] Network mocking for pub.dev API calls - [ ] Error scenario tests (permission denied, disk full, etc.) - [ ] Performance tests for large skill installations - [ ] Cross-platform tests (Windows, macOS, Linux)

@@ -1,0 +1,3 @@
+class MigrationOrchestrator {
+  const MigrationOrchestrator();
+}

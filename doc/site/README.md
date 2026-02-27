@@ -12,6 +12,8 @@ This site is versioned.
 - [Current Overview](v0.2.0/overview.md)
 - [Current Getting Started](v0.2.0/getting-started.md)
 - [Current Command Reference](v0.2.0/commands/index.md)
+- [User Docs](user/README.md)
+- [Developer Docs](developer/README.md)
 - [Legacy Overview](v0.1.9/overview.md)
 - [Legacy Command Reference](v0.1.9/commands/index.md)
 

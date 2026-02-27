@@ -456,6 +456,115 @@ void main() {
       );
     });
 
+    test(
+        'init without namespace uses default namespace inline actions when registries are configured',
+        () async {
+      final fixture = jsonDecode(
+        File(
+          p.join(
+            originalCwd.path,
+            'test',
+            'fixtures',
+            'registry_inline_init_entry.json',
+          ),
+        ).readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final registryEntry = Map<String, dynamic>.from(fixture);
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        final path = request.uri.path;
+        if (path == '/registries.json') {
+          final entry = Map<String, dynamic>.from(registryEntry)
+            ..['baseUrl'] = 'https://example.com/registry/'
+            ..['paths'] = {'componentsJson': 'components.json'};
+          request.response.write(
+            jsonEncode({
+              'schemaVersion': 1,
+              'registries': [entry],
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/shared/theme/color_scheme.dart') {
+          request.response.write('class AppColorScheme {}');
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/index.json') {
+          request.response.write(
+            jsonEncode({
+              'files': ['registry/components/button/button.dart'],
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+        if (path == '/registry/components/button/button.dart') {
+          request.response.write('class Button {}');
+          await request.response.close();
+          return;
+        }
+        request.response.statusCode = 404;
+        await request.response.close();
+      });
+
+      File(p.join(appRoot.path, '.shadcn', 'config.json')).writeAsStringSync(
+        jsonEncode({
+          'defaultNamespace': 'shadcn',
+          'registries': {
+            'shadcn': {
+              'registryMode': 'remote',
+              'registryUrl': 'http://${server.address.host}:${server.port}/',
+              'baseUrl': 'http://${server.address.host}:${server.port}/',
+              'installPath': 'lib/ui/shadcn',
+              'sharedPath': 'lib/ui/shadcn/shared',
+              'enabled': true
+            }
+          }
+        }),
+      );
+
+      await cli.main([
+        'init',
+        '--registries-url',
+        'http://${server.address.host}:${server.port}/registries.json',
+      ]);
+
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'components',
+            'button',
+            'button.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          p.join(
+            appRoot.path,
+            'lib',
+            'ui',
+            'shadcn',
+            'shared',
+            'theme',
+            'color_scheme.dart',
+          ),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
     test('assets and remove use inline registry actions when available',
         () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
