@@ -1,0 +1,333 @@
+part of 'multi_registry_manager.dart';
+
+extension MultiRegistryInitPart on MultiRegistryManager {
+  Future<bool> canHandleNamespaceInit(String namespace) async {
+    final trimmed = namespace.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+    final config = await ShadcnConfig.load(targetDir);
+    final byConfig = config.registryConfig(trimmed);
+    if (byConfig != null) {
+      return true;
+    }
+    final directory = await _loadDirectory();
+    return directory.registries.any((entry) => entry.namespace == trimmed);
+  }
+
+  Future<void> runNamespaceInit(
+    String namespace, {
+    bool assumeYes = false,
+  }) async {
+    final projectRoot = findProjectRootFrom(targetDir);
+    var config = await ShadcnConfig.load(projectRoot);
+    RegistryDirectoryEntry? directoryEntry;
+    try {
+      final directory = await _loadDirectory();
+      directoryEntry = directory.registries.firstWhere(
+        (entry) => entry.namespace == namespace,
+      );
+    } catch (_) {
+      directoryEntry = null;
+    }
+    final source = directoryEntry != null
+        ? RegistrySource.fromDirectory(directoryEntry)
+        : await _resolveSourceForNamespace(
+            namespace,
+            config,
+            allowDirectoryFallback: false,
+          );
+    if (directoryEntry != null) {
+      config = await _upsertConfigFromDirectory(config, directoryEntry);
+    }
+    config = await _maybePromptInstallPath(
+      config: config,
+      namespace: namespace,
+      source: source,
+      assumeYes: assumeYes,
+    );
+    config = await _maybePromptSharedPath(
+      config: config,
+      namespace: namespace,
+      source: source,
+      capabilities: directoryEntry?.capabilities,
+      assumeYes: assumeYes,
+    );
+    await ShadcnConfig.save(projectRoot, config);
+
+    if (directoryEntry == null) {
+      logger.info('No bootstrap actions defined for this registry.');
+      return;
+    }
+
+    final configured = config.registryConfig(namespace);
+    final overrideBaseUrl = configured?.baseUrl ?? configured?.registryUrl;
+    final initEntry = overrideBaseUrl != null && overrideBaseUrl.isNotEmpty
+        ? RegistryDirectoryEntry(
+            id: directoryEntry.id,
+            displayName: directoryEntry.displayName,
+            minCliVersion: directoryEntry.minCliVersion,
+            baseUrl: overrideBaseUrl,
+            namespace: directoryEntry.namespace,
+            installRoot: directoryEntry.installRoot,
+            paths: directoryEntry.paths,
+            capabilities: directoryEntry.capabilities,
+            trust: directoryEntry.trust,
+            init: directoryEntry.init,
+            raw: directoryEntry.raw,
+          )
+        : directoryEntry;
+
+    final result = await initActionEngine.executeRegistryInit(
+      projectRoot: projectRoot,
+      registry: initEntry,
+      logger: logger,
+    );
+    await _recordInlineExecution(
+      projectRoot: projectRoot,
+      namespace: namespace,
+      category: 'init',
+      record: result.record,
+    );
+
+    final state = await ShadcnState.load(
+      projectRoot,
+      defaultNamespace: config.effectiveDefaultNamespace,
+    );
+    final merged = Map<String, RegistryStateEntry>.from(
+      state.registries ?? const {},
+    );
+    merged[namespace] = RegistryStateEntry(
+      installPath: source.installRoot,
+      sharedPath: source.sharedRoot,
+      themeId: state.themeId,
+    );
+    await ShadcnState.save(
+      projectRoot,
+      ShadcnState(
+        installPath: state.installPath ?? source.installRoot,
+        sharedPath: state.sharedPath ?? source.sharedRoot,
+        themeId: state.themeId,
+        managedDependencies: state.managedDependencies,
+        registries: merged,
+      ),
+    );
+
+    if (!initEntry.hasInlineInit) {
+      logger.info('No bootstrap actions defined for this registry.');
+    } else {
+      logger.success(
+        'Initialized ${source.namespace} (${result.filesWritten} files, ${result.dirsCreated} dirs).',
+      );
+    }
+
+    await _resolveInitTheme(
+      projectRoot: projectRoot,
+      namespace: namespace,
+      registryEntry: initEntry,
+      config: config,
+      assumeYes: assumeYes,
+    );
+  }
+
+  Future<ShadcnConfig> _maybePromptSharedPath({
+    required ShadcnConfig config,
+    required String namespace,
+    required RegistrySource source,
+    required RegistryCapabilities? capabilities,
+    required bool assumeYes,
+  }) async {
+    final supportsSharedGroups = capabilities?.sharedGroups ?? false;
+    if (!supportsSharedGroups || assumeYes) {
+      return config;
+    }
+    final current = config.registryConfig(namespace);
+    final defaultPath = (current?.sharedPath?.trim().isNotEmpty ?? false)
+        ? current!.sharedPath!.trim()
+        : source.sharedRoot;
+    stdout.write('Shared files path (default: $defaultPath). Enter to keep: ');
+    final input = stdin.readLineSync()?.trim() ?? '';
+    final nextPath = input.isEmpty ? defaultPath : input;
+    final registries = Map<String, RegistryConfigEntry>.from(config.registries ?? {});
+    final nextEntry = (current ?? const RegistryConfigEntry()).copyWith(
+      sharedPath: nextPath,
+      installPath: current?.installPath ?? source.installRoot,
+      enabled: current?.enabled ?? true,
+    );
+    registries[namespace] = nextEntry;
+    return config.copyWith(registries: registries);
+  }
+
+  Future<ShadcnConfig> _maybePromptInstallPath({
+    required ShadcnConfig config,
+    required String namespace,
+    required RegistrySource source,
+    required bool assumeYes,
+  }) async {
+    if (assumeYes) {
+      return config;
+    }
+    final current = config.registryConfig(namespace);
+    final defaultPath = (current?.installPath?.trim().isNotEmpty ?? false)
+        ? current!.installPath!.trim()
+        : source.installRoot;
+    stdout.write(
+      'Component install path inside lib/ (e.g. lib/ui/shadcn or lib/pages/docs) (default: $defaultPath). Enter to keep: ',
+    );
+    final input = stdin.readLineSync()?.trim() ?? '';
+    final nextPath = input.isEmpty ? defaultPath : input;
+    final sharedDefault = (current?.sharedPath?.trim().isNotEmpty ?? false)
+        ? current!.sharedPath!.trim()
+        : source.sharedRoot;
+    final registries = Map<String, RegistryConfigEntry>.from(config.registries ?? {});
+    final nextEntry = (current ?? const RegistryConfigEntry()).copyWith(
+      installPath: nextPath,
+      sharedPath: sharedDefault,
+      enabled: current?.enabled ?? true,
+    );
+    registries[namespace] = nextEntry;
+    return config.copyWith(registries: registries);
+  }
+
+  Future<void> _resolveInitTheme({
+    required String projectRoot,
+    required String namespace,
+    required RegistryDirectoryEntry registryEntry,
+    required ShadcnConfig config,
+    required bool assumeYes,
+  }) async {
+    final supportsTheme = registryEntry.capabilities.theme;
+    final themesPath = registryEntry.themesPath?.trim();
+    if (!supportsTheme || themesPath == null || themesPath.isEmpty) {
+      return;
+    }
+
+    final registryId = _themeRegistryId(namespace, registryEntry.baseUrl);
+    final cacheRoot = p.join(projectRoot, '.shadcn', 'cache', 'registry', registryId);
+    final indexLoader = ThemeIndexLoader(
+      registryId: registryId,
+      registryBaseUrl: registryEntry.baseUrl,
+      themesPath: themesPath,
+      themesSchemaPath: registryEntry.themesSchemaPath,
+      refresh: false,
+      offline: offline,
+      logger: logger,
+      cacheRootPath: cacheRoot,
+    );
+    final presetLoader = ThemePresetLoader(
+      registryId: registryId,
+      registryBaseUrl: registryEntry.baseUrl,
+      themesPath: themesPath,
+      themesSchemaPath: registryEntry.themesSchemaPath,
+      themeConverterDartPath: registryEntry.themeConverterDartPath,
+      refresh: false,
+      offline: offline,
+      logger: logger,
+      cacheRootPath: cacheRoot,
+    );
+
+    final indexData = await indexLoader.load();
+    final entries = indexLoader.entriesFrom(indexData);
+    if (entries.isEmpty) {
+      logger.info('No theme presets available for @$namespace.');
+      return;
+    }
+
+    final selected = assumeYes
+        ? _defaultThemeEntry(indexData, entries)
+        : _promptThemeSelection(namespace: namespace, entries: entries, indexData: indexData);
+    if (selected == null) {
+      logger.info('Skipping theme selection.');
+      return;
+    }
+
+    final preset = await presetLoader.loadPreset(selected);
+    final source = await _resolveSourceForNamespace(
+      namespace,
+      config,
+      allowDirectoryFallback: true,
+    );
+    final registry = await _loadRegistryForSource(source, projectRoot: projectRoot);
+    final installer = Installer(
+      registry: registry,
+      targetDir: projectRoot,
+      logger: logger,
+      installPathOverride: source.installRoot,
+      sharedPathOverride: source.sharedRoot,
+      stateNamespace: namespace,
+      registryNamespace: namespace,
+      enableSharedGroups: registryEntry.capabilities.sharedGroups,
+      enableComposites: registryEntry.capabilities.composites,
+    );
+    await installer.applyThemeFromJson({
+      'id': preset.id,
+      'name': preset.name,
+      'light': preset.light,
+      'dark': preset.dark,
+    });
+  }
+
+  ThemeIndexEntry _defaultThemeEntry(
+    Map<String, dynamic> indexData,
+    List<ThemeIndexEntry> entries,
+  ) {
+    final defaultId = indexData['default']?.toString().trim();
+    if (defaultId != null && defaultId.isNotEmpty) {
+      for (final entry in entries) {
+        if (entry.id == defaultId) {
+          return entry;
+        }
+      }
+    }
+    final raw = indexData['themes'] ?? indexData['items'];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map && item['default'] == true) {
+          final id = item['id']?.toString();
+          if (id != null) {
+            for (final entry in entries) {
+              if (entry.id == id) {
+                return entry;
+              }
+            }
+          }
+        }
+      }
+    }
+    return entries.first;
+  }
+
+  ThemeIndexEntry? _promptThemeSelection({
+    required String namespace,
+    required List<ThemeIndexEntry> entries,
+    required Map<String, dynamic> indexData,
+  }) {
+    logger.info('Select a starter theme for @$namespace (press Enter to skip):');
+    for (var i = 0; i < entries.length; i++) {
+      final preset = entries[i];
+      logger.info('  ${i + 1}) ${preset.name} (${preset.id})');
+    }
+    stdout.write('Theme number: ');
+    final input = stdin.readLineSync()?.trim();
+    if (input == null || input.isEmpty) {
+      return null;
+    }
+    final index = int.tryParse(input);
+    if (index != null && index >= 1 && index <= entries.length) {
+      return entries[index - 1];
+    }
+    for (final entry in entries) {
+      if (entry.id == input) {
+        return entry;
+      }
+    }
+    final defaultEntry = _defaultThemeEntry(indexData, entries);
+    logger.warn('Invalid theme selection. Using default: ${defaultEntry.id}.');
+    return defaultEntry;
+  }
+
+  String _themeRegistryId(String namespace, String baseUrl) {
+    final key = '$namespace:$baseUrl';
+    return key.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  }
+}

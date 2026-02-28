@@ -1,0 +1,9 @@
+{
+  "installPath": "lib/ui/shadcn",
+  "sharedPath": "lib/ui/shadcn/shared",
+  "themeId": "modern-minimal",
+  "managedDependencies": [
+    "gap",
+    "data_widget"
+  ]
+}

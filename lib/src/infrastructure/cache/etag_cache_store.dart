@@ -1,0 +1,3 @@
+class EtagCacheStore {
+  const EtagCacheStore();
+}

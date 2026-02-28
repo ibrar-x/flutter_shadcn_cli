@@ -1,0 +1,18 @@
+{
+  "defaultNamespace": "shadcn",
+  "registries": {
+    "shadcn": {
+      "registryMode": "remote",
+      "registryUrl": "https://example.com/registry",
+      "installPath": "lib/ui/shadcn",
+      "sharedPath": "lib/ui/shadcn/shared",
+      "includeFiles": ["meta"],
+      "excludeFiles": ["preview"],
+      "enabled": true
+    }
+  },
+  "includeReadme": false,
+  "includeMeta": true,
+  "includePreview": false,
+  "checkUpdates": true
+}

@@ -22,7 +22,15 @@ CLI installer for the shadcn_flutter registry. It copies Widgets and shared help
 - Tracks installed Widgets in a local components.json.
 - Full cleanup on remove --all (components, composites, shared, config, empty folders).
 - **Component discovery**: list, search, and info commands with intelligent caching.
+- **Multi-registry support**: registry directory discovery, namespace init, and default namespace selection.
+- **Namespace installs**: `@namespace/component` and `namespace:component` addressing for explicit registry selection.
+- **JSON output**: Pretty-printed `--json` output for list, search, info, doctor, and dry-run (automation friendly).
+- **Command aliases**: `ls` → `list`, `rm` → `remove`, `i` → `info`.
 - **Dry-run preview**: See dependencies, assets, and platform changes before install.
+- **Registry validation**: `validate` checks schema + registry file integrity.
+- **Audit tooling**: `audit` compares installed versions/tags vs registry and checks missing files.
+- **Dependency audit**: `deps` compares registry dependency requirements with `pubspec.yaml`.
+- **Offline mode**: `--offline` disables network calls and uses cached registry/index data.
 - **AI skill manager**: Interactive multi-skill installation with auto-discovery of 28+ AI model folders (.claude, .cursor, .gemini, etc.).
   - Human-readable model names (\"Cursor\", \"Claude (Anthropic)\", \"Codex (OpenAI)\")
   - Install multiple skills to multiple models in one flow
@@ -105,6 +113,12 @@ flutter_shadcn init --yes \
 flutter_shadcn add button
 ```
 
+Install from a specific registry namespace:
+
+```bash
+flutter_shadcn add @shadcn/button
+```
+
 Add more than one:
 
 ```bash
@@ -117,11 +131,24 @@ Add everything:
 flutter_shadcn add --all
 ```
 
+Control optional files at install time:
+
+```bash
+flutter_shadcn add @shadcn/button --include-files=preview
+flutter_shadcn add @shadcn/button --exclude-files=readme,meta
+```
+
+`preview` matching includes files like `preview_state.dart`.
+
 Add assets only:
 
 ```bash
 flutter_shadcn assets --all
 ```
+
+When a selected registry defines inline init asset actions in `registries.json`,
+`assets` applies those actions first. If none are available, CLI falls back to
+legacy `icon_fonts` / `typography_fonts` component installs.
 
 ### 3) Remove Widgets
 
@@ -140,6 +167,61 @@ Remove everything:
 ```bash
 flutter_shadcn remove --all
 ```
+
+Aliases:
+
+```bash
+flutter_shadcn rm button
+flutter_shadcn ls
+flutter_shadcn i button
+```
+
+## Automation & Diagnostics
+
+Pretty JSON output (for scripts):
+
+```bash
+flutter_shadcn list --json
+flutter_shadcn doctor --json
+flutter_shadcn dry-run button --json
+```
+
+Validate registry integrity:
+
+```bash
+flutter_shadcn validate
+```
+
+Audit installed components:
+
+```bash
+flutter_shadcn audit
+```
+
+Compare registry dependencies vs pubspec:
+
+```bash
+flutter_shadcn deps
+```
+
+Offline mode (cache-only):
+
+```bash
+flutter_shadcn list --offline --json
+```
+
+Exit codes (common):
+
+- `2` usage error
+- `10` registry not found
+- `20` schema invalid
+- `30` component missing
+- `31` file missing
+- `40` network error
+- `41` offline cache unavailable
+- `50` validation failed
+- `60` config invalid
+- `70` IO error
 
 ## One‑line setup (fast)
 
@@ -185,6 +267,39 @@ Use a custom CDN URL:
 flutter_shadcn add button --registry remote --registry-url https://cdn.jsdelivr.net/gh/ibrar-x/shadcn_flutter_kit@latest/flutter_shadcn_kit/lib
 ```
 
+### Multi-registry selection
+
+List all configured/discovered registries:
+
+```bash
+flutter_shadcn registries
+```
+
+Set default registry namespace:
+
+```bash
+flutter_shadcn default shadcn
+```
+
+Use unqualified names with default namespace resolution:
+
+```bash
+flutter_shadcn add button
+```
+
+Use explicit namespace addressing:
+
+```bash
+flutter_shadcn add @shadcn/button
+flutter_shadcn add orient:card
+```
+
+Run inline namespace bootstrap actions:
+
+```bash
+flutter_shadcn init shadcn
+```
+
 Default remote base URL (jsdelivr CDN):
 
 ```text
@@ -200,9 +315,26 @@ Saved choices per project:
 - includeReadme (optional)
 - includeMeta (recommended)
 - includePreview (optional)
+- includeFiles / excludeFiles (optional file-kind policy: `readme`, `preview`, `meta`)
 - classPrefix (optional aliases)
 - pathAliases (optional @alias paths)
+- defaultNamespace (default registry namespace)
+- registries (per-namespace registry config map)
 - registryMode, registryPath, registryUrl
+
+Per-registry optional file policy can be set in `registries.<namespace>`:
+
+```json
+{
+  "defaultNamespace": "shadcn",
+  "registries": {
+    "shadcn": {
+      "includeFiles": ["preview"],
+      "excludeFiles": ["meta"]
+    }
+  }
+}
+```
 
 The CLI also writes a local manifest at `<installPath>/components.json` with
 the list of installed Widgets and component metadata (version/tags). It also
@@ -247,6 +379,14 @@ flutter_shadcn init --yes \
 
 ```bash
 flutter_shadcn add button
+```
+
+```bash
+flutter_shadcn add @shadcn/button
+```
+
+```bash
+flutter_shadcn add @shadcn/button --include-files=preview
 ```
 
 ### dry-run
@@ -303,13 +443,25 @@ flutter_shadcn remove button
 ```
 
 ```bash
+flutter_shadcn remove @shadcn/button
+```
+
+```bash
 flutter_shadcn remove --all
+```
+
+Rollback inline-managed assets:
+
+```bash
+flutter_shadcn remove typography_fonts
+flutter_shadcn remove icon_fonts
 ```
 
 ### theme
 
 ```bash
 flutter_shadcn theme --list
+flutter_shadcn theme @shadcn --list
 ```
 
 Apply a custom theme JSON file (experimental):
@@ -351,6 +503,7 @@ flutter_shadcn --experimental theme --apply-url https://example.com/theme.json
 
 ```bash
 flutter_shadcn sync
+flutter_shadcn sync @shadcn
 ```
 
 Use `sync` after editing .shadcn/config.json to move paths and re-apply the theme.
@@ -372,6 +525,7 @@ Uses local registry when available; falls back to remote.
 
 ```bash
 flutter_shadcn list
+flutter_shadcn list @shadcn
 ```
 
 Refresh cache from remote:
@@ -386,6 +540,7 @@ Search for components by name, description, tags, or keywords:
 
 ```bash
 flutter_shadcn search button
+flutter_shadcn search @shadcn button
 ```
 
 Search results are ranked by relevance:
@@ -406,6 +561,12 @@ Get detailed information about a specific component:
 
 ```bash
 flutter_shadcn info button
+```
+
+Inspect a specific registry namespace:
+
+```bash
+flutter_shadcn info @shadcn/button
 ```
 
 Shows:
@@ -510,9 +671,32 @@ The CLI automatically checks for updates once per 24 hours on every command exec
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ A new version of flutter_shadcn_cli is available!      │
-│ Current: 0.1.8 → Latest: 0.1.9                          │
+│ Current: <current> → Latest: <latest>                   │
 │ Run: flutter_shadcn upgrade                             │
 └─────────────────────────────────────────────────────────┘
+```
+
+### registries
+
+List configured/discoverable registries:
+
+```bash
+flutter_shadcn registries
+flutter_shadcn registries --json
+```
+
+### default
+
+Show current default registry:
+
+```bash
+flutter_shadcn default
+```
+
+Set default registry namespace:
+
+```bash
+flutter_shadcn default shadcn
 ```
 
 **Disable automatic checks:**
@@ -529,6 +713,7 @@ Submit feedback, report bugs, or request features via GitHub:
 
 ```bash
 flutter_shadcn feedback
+flutter_shadcn feedback @shadcn
 ```
 
 The feedback command provides an interactive menu with the following options:
@@ -576,7 +761,8 @@ Use them like:
 ## Optional Files
 
 - meta.json is strongly recommended for audits and validation.
-- README.md and preview.dart are optional and skipped by default.
+- README.md and preview files are optional and skipped by default.
+- `preview` matching is substring-based, so `preview_state.dart` is treated as a preview file too.
 
 ## Verbose Output
 
@@ -645,6 +831,8 @@ If aliases are missing:
 - Folder alias support with @alias paths.
 - Init installs core shared helpers + required deps by default.
 - `assets` command for installing icon/typography fonts.
+- `assets` supports inline registry actions with legacy component fallback.
+- `remove` can rollback inline-managed typography/icon asset installs.
 - Init flags for installing icons/fonts on demand.
 - Dependency updates are batched for faster installs/removals.
 - remove --all cleans empty parent folders after deleting files.

@@ -1,0 +1,134 @@
+# Refactor Progress
+
+Date: 2026-02-22
+
+## Completed
+- Baseline freeze doc added: `doc/refactor/BASELINE_MATRIX.md`
+- Architecture boundary doc added: `doc/architecture/CLEAN_ARCHITECTURE.md`
+- Command lifecycle + contributor rules docs added
+- Thin bin bootstrap: `bin/shadcn.dart` now delegates to `presentation/cli/bootstrap.dart`
+- Command registry metadata module added: `presentation/cli/command_registry.dart`
+- Usage rendering moved to `presentation/cli/usage.dart`
+- Parser moved to `presentation/cli/cli_parser.dart`
+- Root/registry/platform/doctor helper modules added and wired
+- Removed duplicated bootstrap implementations for:
+  - parser construction
+  - usage rendering
+  - runtime root discovery
+  - registry selection/cache helpers
+  - doctor diagnostics internals
+- Extracted command handlers:
+  - `init` -> `presentation/cli/commands/init_command.dart`
+  - `add` -> `presentation/cli/commands/add_command.dart`
+  - `remove` -> `presentation/cli/commands/remove_command.dart`
+  - `search` -> `presentation/cli/commands/search_command.dart`
+  - `list` -> `presentation/cli/commands/list_command.dart`
+  - `info` -> `presentation/cli/commands/info_command.dart`
+  - `theme` -> `presentation/cli/commands/theme_command.dart`
+  - `dry-run` -> `presentation/cli/commands/dry_run_command.dart`
+  - `assets` -> `presentation/cli/commands/assets_command.dart`
+  - `sync` -> `presentation/cli/commands/sync_command.dart`
+  - `validate` -> `presentation/cli/commands/validate_command.dart`
+  - `audit` -> `presentation/cli/commands/audit_command.dart`
+  - `deps` -> `presentation/cli/commands/deps_command.dart`
+  - `registries/default/platform` -> `presentation/cli/commands_registry.dart`
+  - `docs` -> `presentation/cli/commands/docs_command.dart`
+  - `version` -> `presentation/cli/commands/version_command.dart`
+  - `upgrade` -> `presentation/cli/commands/upgrade_command.dart`
+  - `feedback` -> `presentation/cli/commands/feedback_command.dart`
+  - `install-skill` -> `presentation/cli/commands/install_skill_command.dart`
+- Deleted temporary/legacy extraction artifacts:
+  - `presentation/cli/commands/ops_command.dart`
+  - `presentation/cli/commands/*_command_entry.dart` placeholders
+- Fixed init routing regression:
+  - explicit legacy registry flags (`--registry`, `--registry-path`, `--registry-url`) now prevent accidental inline-init routing
+- Clean architecture folder skeleton added (`core`, `domain`, `application`, `infrastructure`, `presentation`)
+- Introduced application-layer `InstallerOrchestrator` and routed command modules through it:
+  - `init`
+  - `add`
+  - `remove`
+  - `assets`
+- Replaced bootstrap monolithic switch with registry-based dispatcher:
+  - `presentation/cli/command_dispatcher.dart`
+  - dispatch map wiring in `presentation/cli/bootstrap.dart`
+- Split multi-registry internals:
+  - extracted source/data models into `application/services/multi_registry_types.dart`
+  - extracted add-resolution policy into `application/services/add_resolution_service.dart`
+  - centralized project-root resolution in `core/utils/path_utils.dart`
+- Wired domain repository abstractions to infrastructure adapters:
+  - `infrastructure/persistence/config_repository_adapter.dart`
+  - `infrastructure/persistence/state_repository_adapter.dart`
+  - `infrastructure/registry/registry_repository_adapter.dart`
+  - `infrastructure/io/file_repository_adapter.dart`
+- Major installer monolith split completed:
+  - `installer.dart` reduced to thin core (2443 -> 459 lines)
+  - extracted modules:
+    - `installer_dry_run_part.dart`
+    - `installer_shared_part.dart`
+    - `installer_manifest_part.dart`
+    - `installer_file_install_part.dart`
+    - `installer_platform_alias_part.dart`
+    - `installer_pubspec_part.dart`
+- Multi-registry manager monolith split completed:
+  - `multi_registry_manager.dart` reduced to thin core (722 -> 62 lines)
+  - extracted modules:
+    - `multi_registry_init_part.dart`
+    - `multi_registry_add_part.dart`
+    - `multi_registry_assets_part.dart`
+    - `multi_registry_directory_part.dart`
+- Bootstrap orchestration decomposition:
+  - extracted route/preload helpers into `presentation/cli/bootstrap_support.dart`
+  - `presentation/cli/bootstrap.dart` reduced and now delegates routing/preload logic
+- `lib/src` root cleanup and layering:
+  - moved root implementations into layer folders (`core`, `application`, `infrastructure`, `presentation`)
+  - kept backward-compatible root import paths via export-only compatibility stubs
+- One-class-per-file enforcement:
+  - verified no `lib/src/**.dart` file declares more than one class
+  - split remaining grouped model classes previously embedded in monolithic files
+- Moved implementation modules to layered locations:
+  - `logger.dart` -> `core/logging/cli_logger.dart`
+  - `json_output.dart` -> `presentation/cli/output/json_output.dart`
+  - `index_loader.dart` -> `infrastructure/registry/index_loader.dart`
+  - `discovery_commands.dart` -> `application/services/discovery/discovery_commands.dart`
+  - `docs_generator.dart` -> `application/services/docs/docs_generator.dart`
+  - `feedback_manager.dart` -> `application/services/feedback/feedback_manager.dart`
+  - `version_manager.dart` -> `application/services/version/version_manager.dart`
+  - `skill_manager.dart` -> `application/services/skills/skill_manager.dart`
+  - `skills_loader.dart` -> `infrastructure/skills/skills_loader.dart`
+  - `studio_manager.dart` -> `application/services/studio/studio_manager.dart`
+  - `theme_css.dart` -> `application/services/theme/theme_css.dart`
+  - `audit_command.dart` / `deps_command.dart` / `validate_command.dart` -> `application/services/legacy_commands/*`
+  - `installer.dart` + all installer part files -> `application/services/installer/*`
+  - `init_action_engine.dart` + all part files -> `application/services/init_action_engine/*`
+  - `multi_registry_manager.dart` + part files + exception -> `application/services/multi_registry/*`
+- Documentation and issue intake refresh:
+  - added user vs developer doc hubs under `doc/site/*` and `doc/site/v0.2.0/*`
+  - updated feedback command docs to reflect generated checklist + dynamic environment context
+  - added GitHub issue templates with mandatory pre-issue checklist in `.github/ISSUE_TEMPLATE/*`
+  - updated feedback generator to use runtime CLI version (`VersionManager.currentVersion`) and include UTC report timestamp
+- Legacy isolation hardening:
+  - moved active audit/deps/validate implementation files from `application/services/legacy_commands/*` to `application/services/command_health/*`
+  - updated CLI command handlers to use non-legacy aliases/imports
+  - nested legacy compatibility sources under `lib/src/legacy/v0_1_9/*`
+  - retained `lib/src/legacy/*.dart` as compatibility stubs to versioned legacy paths
+
+## Verified gates (this iteration)
+- `dart analyze` (green)
+- `test/command_matrix_test.dart` (green)
+- `test/cli_integration_test.dart` (green)
+- `test/config_state_migration_test.dart` (green)
+- `test/multi_registry_manager_test.dart` (green)
+- `test/init_action_engine_test.dart` (green)
+
+## Remaining
+- Optional: replace remaining installer `part` modules with discrete injected services
+- Optional: split bootstrap dispatcher map construction into dedicated builder module
+- Final dead-code sweep + docs updates for the refactored command structure
+  - Completed in this pass:
+    - Removed temporary refactor utility file: `tool_check_shared.dart`
+    - Updated docs:
+      - `doc/architecture/CLEAN_ARCHITECTURE.md`
+      - `doc/architecture/COMMAND_LIFECYCLE.md`
+      - `doc/architecture/CONTRIBUTING_RULES.md`
+      - `doc/site/internals/architecture.md`
+      - `doc/site/v0.2.0/internals/architecture.md`

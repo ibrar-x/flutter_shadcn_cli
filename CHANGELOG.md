@@ -4,6 +4,50 @@
 
 - (empty)
 
+## 0.2.0
+
+### 🧭 Multi-Registry v1
+- **NEW**: Multi-registry namespace architecture with per-registry config/state addressing.
+- **NEW**: Registry directory (`registries.json`) loading with schema validation and local cache support.
+- **NEW**: Namespace bootstrap via `flutter_shadcn init <namespace>` executing inline init actions.
+- **NEW**: Namespace-qualified component references:
+  - Preferred: `@namespace/component`
+  - Backward-compatible: `namespace:component`
+- **NEW**: `registries` command to list configured/discovered registries.
+- **NEW**: `default` command to get/set default registry namespace.
+
+### 🧩 Compatibility
+- **IMPROVED**: Automatic migration of legacy `.shadcn/config.json` to `registries` map format.
+- **IMPROVED**: Automatic migration of legacy `.shadcn/state.json` to `registries` state format.
+- **IMPROVED**: Existing single-registry behavior preserved while routing through new engine.
+
+### 🔒 Safety
+- **IMPROVED**: URL resolver validation and base URL normalization for registry fetches.
+- **IMPROVED**: Strict filesystem traversal protection on all write targets.
+
+## 0.1.9
+
+### 🧾 Output & Automation
+- **NEW**: Pretty-printed `--json` output for list, search, info, doctor, dry-run, validate, audit, and deps.
+- **NEW**: Standardized JSON envelope with `status`, `data`, `errors`, `warnings`, `meta`.
+- **NEW**: Standardized exit codes for common failure categories.
+
+### 🧭 CLI Ergonomics
+- **NEW**: Command aliases `ls` → `list`, `rm` → `remove`, `i` → `info`.
+- **NEW**: `--offline` mode for cache-only registry/index usage.
+- **IMPROVED**: Init flow now shows a summary and confirms before writing (unless `--yes`).
+
+### 📚 Documentation
+- **IMPROVED**: Updated README and site docs for new commands, JSON output, offline mode, and exit codes.
+
+### ✅ Registry Integrity
+- **NEW**: `validate` command for schema + registry integrity checks.
+- **NEW**: `audit` command to compare installed components vs registry metadata.
+- **NEW**: `deps` command to compare registry deps vs pubspec.yaml.
+
+### ⚡ Performance
+- **IMPROVED**: Parallelized per-component file installs with bounded concurrency.
+
 ## 0.1.8
 
 ### 🧭 Registry & Schema
