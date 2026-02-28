@@ -87,34 +87,39 @@ class RegistryConfigEntry {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'registryMode': registryMode,
-      'registryPath': registryPath,
-      'registryUrl': registryUrl,
-      'baseUrl': baseUrl,
-      'componentsPath': componentsPath,
-      'componentsSchemaPath': componentsSchemaPath,
-      'indexPath': indexPath,
-      'indexSchemaPath': indexSchemaPath,
-      'themesPath': themesPath,
-      'themesSchemaPath': themesSchemaPath,
-      'folderStructurePath': folderStructurePath,
-      'metaPath': metaPath,
-      'themeConverterDartPath': themeConverterDartPath,
-      'installPath': installPath,
-      'sharedPath': sharedPath,
-      'includeReadme': includeReadme,
-      'includeMeta': includeMeta,
-      'includePreview': includePreview,
-      'includeFiles': includeFiles,
-      'excludeFiles': excludeFiles,
-      'capabilitySharedGroups': capabilitySharedGroups,
-      'capabilityComposites': capabilityComposites,
-      'capabilityTheme': capabilityTheme,
-      'trustMode': trustMode,
-      'trustSha256': trustSha256,
-      'enabled': enabled,
-    };
+    final json = <String, dynamic>{'enabled': enabled};
+    void add(String key, Object? value) {
+      if (value != null) {
+        json[key] = value;
+      }
+    }
+
+    add('registryMode', registryMode);
+    add('registryPath', registryPath);
+    add('registryUrl', registryUrl);
+    add('baseUrl', baseUrl);
+    add('componentsPath', componentsPath);
+    add('componentsSchemaPath', componentsSchemaPath);
+    add('indexPath', indexPath);
+    add('indexSchemaPath', indexSchemaPath);
+    add('themesPath', themesPath);
+    add('themesSchemaPath', themesSchemaPath);
+    add('folderStructurePath', folderStructurePath);
+    add('metaPath', metaPath);
+    add('themeConverterDartPath', themeConverterDartPath);
+    add('installPath', installPath);
+    add('sharedPath', sharedPath);
+    add('includeReadme', includeReadme);
+    add('includeMeta', includeMeta);
+    add('includePreview', includePreview);
+    add('includeFiles', includeFiles);
+    add('excludeFiles', excludeFiles);
+    add('capabilitySharedGroups', capabilitySharedGroups);
+    add('capabilityComposites', capabilityComposites);
+    add('capabilityTheme', capabilityTheme);
+    add('trustMode', trustMode);
+    add('trustSha256', trustSha256);
+    return json;
   }
 
   RegistryConfigEntry copyWith({

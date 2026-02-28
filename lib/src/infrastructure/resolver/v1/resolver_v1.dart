@@ -20,6 +20,11 @@ class ResolverV1 {
       throw ResolverV1Exception('baseUrl cannot include query or fragment');
     }
 
+    final githubTreeBase = _normalizeGithubTreeBase(uri);
+    if (githubTreeBase != null) {
+      return githubTreeBase;
+    }
+
     final cleanPath = uri.path.replaceAll(RegExp(r'/+'), '/');
     final withoutTrailing = cleanPath.endsWith('/') && cleanPath.length > 1
         ? cleanPath.substring(0, cleanPath.length - 1)
@@ -27,6 +32,51 @@ class ResolverV1 {
     final withTrailing =
         withoutTrailing.endsWith('/') ? withoutTrailing : '$withoutTrailing/';
     return uri.replace(path: withTrailing).toString();
+  }
+
+  static String? githubApiContentsUrl(String baseUrl, String relativePath) {
+    final base = Uri.parse(baseUrl.trim());
+    if (!base.host.toLowerCase().endsWith('github.com')) {
+      return null;
+    }
+    final parts = base.path
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: false);
+    if (parts.length < 4 || parts[2] != 'tree') {
+      return null;
+    }
+    final owner = parts[0];
+    final repo = parts[1];
+    final ref = parts[3];
+    final basePath = parts.length > 4 ? parts.sublist(4).join('/') : '';
+    final rel = normalizeRelativePath(relativePath);
+    final fullPath = basePath.isEmpty ? rel : '$basePath/$rel';
+    return Uri.https(
+      'api.github.com',
+      '/repos/$owner/$repo/contents/$fullPath',
+      {'ref': ref},
+    ).toString();
+  }
+
+  static String? _normalizeGithubTreeBase(Uri uri) {
+    final host = uri.host.toLowerCase();
+    if (!host.endsWith('github.com')) {
+      return null;
+    }
+    final parts = uri.path
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: false);
+    if (parts.length < 4 || parts[2] != 'tree') {
+      return null;
+    }
+    final owner = parts[0];
+    final repo = parts[1];
+    final ref = parts[3];
+    final rest = parts.length > 4 ? '/${parts.sublist(4).join('/')}' : '';
+    final path = '/$owner/$repo/$ref$rest/';
+    return Uri.https('raw.githubusercontent.com', path).toString();
   }
 
   static String normalizeRelativePath(String relativePath) {

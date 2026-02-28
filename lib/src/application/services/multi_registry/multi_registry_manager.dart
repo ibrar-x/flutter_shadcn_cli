@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_shadcn_cli/src/application/services/add_resolution_service.dart';
 import 'package:flutter_shadcn_cli/src/application/dto/add_request.dart';
 import 'package:flutter_shadcn_cli/src/application/dto/qualified_component_ref.dart';
@@ -5,6 +7,9 @@ import 'package:flutter_shadcn_cli/src/application/dto/registry_summary.dart';
 import 'package:flutter_shadcn_cli/src/application/services/registry_source.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/core/utils/path_utils.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_index_entry.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_index_loader.dart';
+import 'package:flutter_shadcn_cli/src/infrastructure/registry/theme_preset_loader.dart';
 import 'package:flutter_shadcn_cli/src/init_action_engine.dart';
 import 'package:flutter_shadcn_cli/src/inline_action_journal.dart';
 import 'package:flutter_shadcn_cli/src/installer.dart';
@@ -14,6 +19,7 @@ import 'package:flutter_shadcn_cli/src/registry.dart';
 import 'package:flutter_shadcn_cli/src/registry_directory.dart';
 import 'package:flutter_shadcn_cli/src/state.dart';
 import 'package:flutter_shadcn_cli/src/version_manager.dart';
+import 'package:path/path.dart' as p;
 
 
 part 'multi_registry_init_part.dart';

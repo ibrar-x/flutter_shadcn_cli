@@ -26,10 +26,14 @@ class RegistryLocation {
       }
       final uri = _resolveRemote(relativePath);
       final response = await _client.get(uri);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Failed to fetch $uri (${response.statusCode})');
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response.bodyBytes;
       }
-      return response.bodyBytes;
+      final apiBytes = await _readViaGithubApi(relativePath);
+      if (apiBytes != null) {
+        return apiBytes;
+      }
+      throw Exception('Failed to fetch $uri (${response.statusCode})');
     }
     final candidates = _localPathCandidates(relativePath);
     for (final path in candidates) {
@@ -57,6 +61,41 @@ class RegistryLocation {
 
   Uri _resolveRemote(String relativePath) {
     return ResolverV1.resolveUrl(root, relativePath);
+  }
+
+  Future<List<int>?> _readViaGithubApi(String relativePath) async {
+    final apiUrl = ResolverV1.githubApiContentsUrl(root, relativePath);
+    if (apiUrl == null) {
+      return null;
+    }
+    final response = await _client.get(
+      Uri.parse(apiUrl),
+      headers: const {
+        'Accept': 'application/vnd.github+json',
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return null;
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      return null;
+    }
+    final downloadUrl = decoded['download_url']?.toString();
+    if (downloadUrl == null || downloadUrl.isEmpty) {
+      final content = decoded['content']?.toString();
+      final encoding = decoded['encoding']?.toString();
+      if (encoding == 'base64' && content != null && content.isNotEmpty) {
+        final normalized = content.replaceAll('\n', '');
+        return base64Decode(normalized);
+      }
+      return null;
+    }
+    final raw = await _client.get(Uri.parse(downloadUrl));
+    if (raw.statusCode < 200 || raw.statusCode >= 300) {
+      return null;
+    }
+    return raw.bodyBytes;
   }
 
   List<String> _localPathCandidates(String relativePath) {

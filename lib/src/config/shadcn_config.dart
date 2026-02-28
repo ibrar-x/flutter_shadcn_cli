@@ -94,27 +94,36 @@ class ShadcnConfig {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'classPrefix': classPrefix,
-      'themeId': themeId,
-      'registryMode': registryMode,
-      'registryPath': registryPath,
-      'registryUrl': registryUrl,
-      'installPath': installPath,
-      'sharedPath': sharedPath,
-      'includeReadme': includeReadme,
-      'includeMeta': includeMeta,
-      'checkUpdates': checkUpdates,
-      'includePreview': includePreview,
-      'includeFiles': includeFiles,
-      'excludeFiles': excludeFiles,
-      'pathAliases': pathAliases,
-      'platformTargets': platformTargets,
+    final json = <String, dynamic>{
       'defaultNamespace': effectiveDefaultNamespace,
-      'registries': registries?.map(
-        (key, value) => MapEntry(key, value.toJson()),
-      ),
     };
+    void add(String key, Object? value) {
+      if (value != null) {
+        json[key] = value;
+      }
+    }
+
+    add('classPrefix', classPrefix);
+    add('themeId', themeId);
+    add('registryMode', registryMode);
+    add('registryPath', registryPath);
+    add('registryUrl', registryUrl);
+    add('installPath', installPath);
+    add('sharedPath', sharedPath);
+    add('includeReadme', includeReadme);
+    add('includeMeta', includeMeta);
+    add('checkUpdates', checkUpdates);
+    add('includePreview', includePreview);
+    add('includeFiles', includeFiles);
+    add('excludeFiles', excludeFiles);
+    add('pathAliases', pathAliases);
+    add('platformTargets', platformTargets);
+    if (registries != null) {
+      json['registries'] = registries!.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      );
+    }
+    return json;
   }
 
   bool get hasRegistries => registries != null && registries!.isNotEmpty;

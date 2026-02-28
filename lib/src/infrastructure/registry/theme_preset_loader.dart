@@ -25,6 +25,7 @@ class ThemePresetLoader {
   final CliLogger? logger;
   final SchemaValidator schemaValidator;
   final ProcessRunner processRunner;
+  final String? cacheRootPath;
 
   ThemePresetLoader({
     required this.registryId,
@@ -35,6 +36,7 @@ class ThemePresetLoader {
     this.refresh = false,
     this.offline = false,
     this.logger,
+    this.cacheRootPath,
     SchemaValidator? schemaValidator,
     ProcessRunner? processRunner,
   })  : schemaValidator = schemaValidator ?? SchemaValidator(),
@@ -300,8 +302,10 @@ class ThemePresetLoader {
   }
 
   Directory _cacheRootDir() {
-    final expandedPath = _cacheDir.replaceFirst('~', _homeDir());
-    return Directory(p.join(expandedPath, registryId));
+    final rootPath = cacheRootPath?.trim().isNotEmpty == true
+        ? cacheRootPath!.trim()
+        : p.join(_cacheDir.replaceFirst('~', _homeDir()), registryId);
+    return Directory(rootPath);
   }
 
   bool _isStale(File file) {

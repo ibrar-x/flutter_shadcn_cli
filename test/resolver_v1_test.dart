@@ -25,6 +25,27 @@ void main() {
       );
     });
 
+    test('normalizes github tree base URL to raw base URL', () {
+      final normalized = ResolverV1.normalizeBaseUrl(
+        'https://github.com/ibrar-x/shadcn_flutter_kit/tree/main/flutter_shadcn_kit/lib/registry',
+      );
+      expect(
+        normalized,
+        'https://raw.githubusercontent.com/ibrar-x/shadcn_flutter_kit/main/flutter_shadcn_kit/lib/registry/',
+      );
+    });
+
+    test('builds github contents API URL for file lookup', () {
+      final apiUrl = ResolverV1.githubApiContentsUrl(
+        'https://github.com/ibrar-x/shadcn_flutter_kit/tree/main/flutter_shadcn_kit/lib/registry',
+        'manifests/components.json',
+      );
+      expect(
+        apiUrl,
+        'https://api.github.com/repos/ibrar-x/shadcn_flutter_kit/contents/flutter_shadcn_kit/lib/registry/manifests/components.json?ref=main',
+      );
+    });
+
     test('rejects invalid relative paths', () {
       const badPaths = [
         '../escape.json',
@@ -72,15 +93,21 @@ void main() {
       expect(mapped, 'lib/ui/shadcn/shared/theme/color_scheme.dart');
     });
 
-    test('rejects copyFiles mapping prefix mismatch', () {
-      expect(
-        () => InitPathMapper.mapCopyFileDestination(
-          filePath: 'other/theme.dart',
-          base: 'registry',
-          destBase: 'lib/ui/shadcn',
-        ),
-        throwsA(isA<ResolverV1Exception>()),
+    test('maps copyFiles with relative file path under base', () {
+      final mapped = InitPathMapper.mapCopyFileDestination(
+        filePath: 'theme/theme.dart',
+        base: 'registry/shared',
+        destBase: 'lib/ui/shadcn/shared',
       );
+      expect(mapped, 'lib/ui/shadcn/shared/theme/theme.dart');
+    });
+
+    test('maps copyFiles source path by prepending base when needed', () {
+      final sourceRel = InitPathMapper.mapSourcePath(
+        filePath: 'theme/theme.dart',
+        base: 'registry/shared',
+      );
+      expect(sourceRel, 'registry/shared/theme/theme.dart');
     });
 
     test('maps copyDir destination with base/destBase', () {

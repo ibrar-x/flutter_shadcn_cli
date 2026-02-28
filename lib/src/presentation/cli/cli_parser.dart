@@ -37,28 +37,11 @@ ArgParser buildCliParser() {
     ..addCommand(
       'init',
       ArgParser()
-        ..addFlag('all', abbr: 'a', negatable: false)
-        ..addFlag('yes', abbr: 'y', negatable: false)
         ..addFlag(
-          'install-fonts',
+          'yes',
+          abbr: 'y',
           negatable: false,
-          help: 'Install typography fonts during init',
-        )
-        ..addFlag(
-          'install-icons',
-          negatable: false,
-          help: 'Install icon font assets during init',
-        )
-        ..addOption('install-path', help: 'Install path inside lib/')
-        ..addOption('shared-path', help: 'Shared path inside lib/')
-        ..addFlag('include-readme', negatable: true)
-        ..addFlag('include-meta', negatable: true)
-        ..addFlag('include-preview', negatable: true)
-        ..addOption('prefix', help: 'Class alias prefix')
-        ..addOption('theme', help: 'Theme preset id')
-        ..addMultiOption(
-          'alias',
-          help: 'Path alias (name=lib/path). Enables @name shorthand.',
+          help: 'Run non-interactively and use defaults',
         )
         ..addFlag('help', abbr: 'h', negatable: false),
     )

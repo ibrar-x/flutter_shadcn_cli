@@ -285,9 +285,13 @@ class InitActionEngine {
         destinationFile.parent.createSync(recursive: true);
       }
 
+      final sourceRel = InitPathMapper.mapSourcePath(
+        filePath: filePath,
+        base: base,
+      );
       final bytes = await _readRemoteBytes(
         baseUrl: baseUrl,
-        relativePath: filePath,
+        relativePath: sourceRel,
       );
       await destinationFile.writeAsBytes(bytes, flush: true);
       written.add(destinationRel);

@@ -15,16 +15,27 @@ class InitPathMapper {
     }
 
     final expectedPrefix = '$base/';
-    if (!filePath.startsWith(expectedPrefix)) {
-      throw ResolverV1Exception(
-        'file path does not start with required base prefix: $filePath',
-      );
-    }
-    final stripped = filePath.substring(expectedPrefix.length);
+    final stripped = filePath.startsWith(expectedPrefix)
+        ? filePath.substring(expectedPrefix.length)
+        : filePath;
     if (stripped.isEmpty) {
       throw ResolverV1Exception('file path cannot map to empty destination');
     }
     return p.posix.join(destBase!, stripped);
+  }
+
+  static String mapSourcePath({
+    required String filePath,
+    String? base,
+  }) {
+    if (base == null) {
+      return filePath;
+    }
+    final expectedPrefix = '$base/';
+    if (filePath.startsWith(expectedPrefix)) {
+      return filePath;
+    }
+    return p.posix.join(base, filePath);
   }
 
   static String mapCopyDirDestination({

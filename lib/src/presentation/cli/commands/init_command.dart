@@ -14,13 +14,16 @@ Future<int> runInitCommand({
     print('');
     print('Runs inline bootstrap actions for the selected namespace.');
     print('Defaults to current default namespace (shadcn by default).');
+    print('Options:');
+    print('  --yes, -y          Non-interactive init (apply defaults)');
     return ExitCodes.success;
   }
   final namespace = initCommand.rest.isNotEmpty
       ? _parseInitNamespaceToken(initCommand.rest.first)
       : defaultNamespace;
+  final assumeYes = initCommand['yes'] == true;
   try {
-    await multiRegistry.runNamespaceInit(namespace);
+    await multiRegistry.runNamespaceInit(namespace, assumeYes: assumeYes);
     return ExitCodes.success;
   } catch (e) {
     stderr.writeln('Error: $e');

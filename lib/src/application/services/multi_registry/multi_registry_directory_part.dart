@@ -166,13 +166,26 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
     }
 
     final configEntry = config.registryConfig(namespace);
+    RegistryDirectoryEntry? directoryEntry;
+    try {
+      final directory = await _loadDirectory();
+      directoryEntry = directory.registries.firstWhere(
+        (item) => item.namespace == namespace,
+      );
+    } catch (_) {
+      directoryEntry = null;
+    }
+
     if (configEntry != null &&
         ((configEntry.registryMode == 'local' && configEntry.registryPath != null) ||
             configEntry.registryUrl != null ||
             configEntry.baseUrl != null)) {
+      final effectiveEntry = directoryEntry == null
+          ? configEntry
+          : _mergeConfigWithDirectoryDefaults(configEntry, directoryEntry);
       final source = RegistrySource.fromConfig(
         namespace: namespace,
-        configEntry: configEntry,
+        configEntry: effectiveEntry,
       );
       _sources[namespace] = source;
       return source;
@@ -182,13 +195,12 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
       throw MultiRegistryException('Registry namespace "$namespace" is not configured.');
     }
 
-    final directory = await _loadDirectory();
-    final entry = directory.registries.firstWhere(
-      (item) => item.namespace == namespace,
-      orElse: () => throw MultiRegistryException(
+    final entry = directoryEntry;
+    if (entry == null) {
+      throw MultiRegistryException(
         'Registry namespace "$namespace" not found in registries directory.',
-      ),
-    );
+      );
+    }
     final source = RegistrySource.fromDirectory(entry);
     _sources[namespace] = source;
     return source;
@@ -207,56 +219,50 @@ extension MultiRegistryDirectoryPart on MultiRegistryManager {
             registryMode: existing.registryMode ?? 'remote',
             registryUrl: existing.registryUrl ?? entry.baseUrl,
             baseUrl: existing.baseUrl ?? entry.baseUrl,
-            componentsPath: existing.componentsPath ?? entry.componentsPath,
-            componentsSchemaPath:
-                existing.componentsSchemaPath ?? entry.componentsSchemaPath,
-            indexPath: existing.indexPath ?? entry.indexPath,
-            indexSchemaPath:
-                existing.indexSchemaPath ?? entry.indexSchemaPath,
-            themesPath: existing.themesPath ?? entry.themesPath,
-            themesSchemaPath:
-                existing.themesSchemaPath ?? entry.themesSchemaPath,
-            folderStructurePath:
-                existing.folderStructurePath ?? entry.folderStructurePath,
-            metaPath: existing.metaPath ?? entry.metaPath,
-            themeConverterDartPath: existing.themeConverterDartPath ??
-                entry.themeConverterDartPath,
             installPath: existing.installPath ?? installRoot,
             sharedPath: existing.sharedPath ?? sharedRoot,
-            capabilitySharedGroups: existing.capabilitySharedGroups ??
-                entry.capabilities.sharedGroups,
-            capabilityComposites:
-                existing.capabilityComposites ?? entry.capabilities.composites,
-            capabilityTheme:
-                existing.capabilityTheme ?? entry.capabilities.theme,
-            trustMode: existing.trustMode ?? entry.trust.mode,
-            trustSha256: existing.trustSha256 ?? entry.trust.sha256,
             enabled: true,
           ) ??
           RegistryConfigEntry(
             registryMode: 'remote',
             registryUrl: entry.baseUrl,
             baseUrl: entry.baseUrl,
-            componentsPath: entry.componentsPath,
-            componentsSchemaPath: entry.componentsSchemaPath,
-            indexPath: entry.indexPath,
-            indexSchemaPath: entry.indexSchemaPath,
-            themesPath: entry.themesPath,
-            themesSchemaPath: entry.themesSchemaPath,
-            folderStructurePath: entry.folderStructurePath,
-            metaPath: entry.metaPath,
-            themeConverterDartPath: entry.themeConverterDartPath,
             installPath: installRoot,
             sharedPath: sharedRoot,
-            capabilitySharedGroups: entry.capabilities.sharedGroups,
-            capabilityComposites: entry.capabilities.composites,
-            capabilityTheme: entry.capabilities.theme,
-            trustMode: entry.trust.mode,
-            trustSha256: entry.trust.sha256,
             enabled: true,
           ),
     );
     return next;
+  }
+
+  RegistryConfigEntry _mergeConfigWithDirectoryDefaults(
+    RegistryConfigEntry configEntry,
+    RegistryDirectoryEntry directoryEntry,
+  ) {
+    return configEntry.copyWith(
+      baseUrl: configEntry.baseUrl ?? directoryEntry.baseUrl,
+      registryUrl: configEntry.registryUrl ?? directoryEntry.baseUrl,
+      componentsPath: configEntry.componentsPath ?? directoryEntry.componentsPath,
+      componentsSchemaPath:
+          configEntry.componentsSchemaPath ?? directoryEntry.componentsSchemaPath,
+      indexPath: configEntry.indexPath ?? directoryEntry.indexPath,
+      indexSchemaPath: configEntry.indexSchemaPath ?? directoryEntry.indexSchemaPath,
+      themesPath: configEntry.themesPath ?? directoryEntry.themesPath,
+      themesSchemaPath:
+          configEntry.themesSchemaPath ?? directoryEntry.themesSchemaPath,
+      folderStructurePath:
+          configEntry.folderStructurePath ?? directoryEntry.folderStructurePath,
+      metaPath: configEntry.metaPath ?? directoryEntry.metaPath,
+      themeConverterDartPath:
+          configEntry.themeConverterDartPath ?? directoryEntry.themeConverterDartPath,
+      capabilitySharedGroups:
+          configEntry.capabilitySharedGroups ?? directoryEntry.capabilities.sharedGroups,
+      capabilityComposites:
+          configEntry.capabilityComposites ?? directoryEntry.capabilities.composites,
+      capabilityTheme: configEntry.capabilityTheme ?? directoryEntry.capabilities.theme,
+      trustMode: configEntry.trustMode ?? directoryEntry.trust.mode,
+      trustSha256: configEntry.trustSha256 ?? directoryEntry.trust.sha256,
+    );
   }
 
   Future<RegistryDirectory> _loadDirectory() async {

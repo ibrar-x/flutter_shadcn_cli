@@ -20,6 +20,7 @@ class ThemeIndexLoader {
   final bool offline;
   final CliLogger? logger;
   final SchemaValidator schemaValidator;
+  final String? cacheRootPath;
 
   ThemeIndexLoader({
     required this.registryId,
@@ -29,6 +30,7 @@ class ThemeIndexLoader {
     this.refresh = false,
     this.offline = false,
     this.logger,
+    this.cacheRootPath,
     SchemaValidator? schemaValidator,
   }) : schemaValidator = schemaValidator ?? SchemaValidator();
 
@@ -99,8 +101,10 @@ class ThemeIndexLoader {
   }
 
   File _getCacheFile() {
-    final expandedPath = _cacheDir.replaceFirst('~', _homeDir());
-    final cacheDir = Directory(p.join(expandedPath, registryId));
+    final rootPath = cacheRootPath?.trim().isNotEmpty == true
+        ? cacheRootPath!.trim()
+        : p.join(_cacheDir.replaceFirst('~', _homeDir()), registryId);
+    final cacheDir = Directory(rootPath);
     if (!cacheDir.existsSync()) {
       cacheDir.createSync(recursive: true);
     }
