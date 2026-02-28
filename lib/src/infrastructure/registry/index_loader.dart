@@ -6,7 +6,6 @@ import 'package:flutter_shadcn_cli/src/resolver_v1.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
-export 'package:flutter_shadcn_cli/src/index/index_component.dart';
 
 /// Manages loading and caching of registry index.json with staleness checking.
 class IndexLoader {

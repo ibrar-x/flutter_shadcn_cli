@@ -178,6 +178,44 @@ class ThemePresetLoader {
 
   Future<File?> _resolveConverterScriptFile(String converterPath) async {
     final cacheFile = _converterCacheFile();
+    final converterUri = Uri.tryParse(converterPath);
+    if (converterUri != null && converterUri.hasScheme) {
+      if (converterUri.scheme == 'file') {
+        final localFile = File(converterUri.toFilePath());
+        if (!localFile.existsSync()) {
+          logger?.warn('Theme converter script not found: $converterPath');
+          return null;
+        }
+        if (!cacheFile.parent.existsSync()) {
+          cacheFile.parent.createSync(recursive: true);
+        }
+        cacheFile.writeAsBytesSync(localFile.readAsBytesSync(), flush: true);
+        return cacheFile;
+      }
+      if (converterUri.scheme == 'http' || converterUri.scheme == 'https') {
+        if (offline && cacheFile.existsSync()) {
+          return cacheFile;
+        }
+        if (offline) {
+          return null;
+        }
+        final response = await http.get(converterUri);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          logger?.warn(
+            'Failed to fetch converter script ${converterUri.toString()} (${response.statusCode}).',
+          );
+          return null;
+        }
+        if (!cacheFile.parent.existsSync()) {
+          cacheFile.parent.createSync(recursive: true);
+        }
+        cacheFile.writeAsBytesSync(response.bodyBytes, flush: true);
+        return cacheFile;
+      }
+      logger?.warn('Unsupported converter URI scheme: ${converterUri.scheme}');
+      return null;
+    }
+
     final local = _resolveLocalFile(converterPath);
     if (local != null && local.existsSync()) {
       if (!cacheFile.parent.existsSync()) {

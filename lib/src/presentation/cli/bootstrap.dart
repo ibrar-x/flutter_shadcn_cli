@@ -35,6 +35,7 @@ import 'package:flutter_shadcn_cli/src/presentation/cli/commands_doctor.dart';
 import 'package:flutter_shadcn_cli/src/presentation/cli/registry_selection.dart';
 import 'package:flutter_shadcn_cli/src/presentation/cli/runtime_roots.dart';
 import 'package:flutter_shadcn_cli/src/presentation/cli/bootstrap_support.dart';
+import 'package:flutter_shadcn_cli/src/presentation/cli/registry_bootstrap_exception.dart';
 import 'package:flutter_shadcn_cli/src/presentation/cli/usage.dart';
 
 Future<void> runCliBootstrap(List<String> arguments) async {
@@ -214,9 +215,7 @@ Future<void> runCliBootstrap(List<String> arguments) async {
           },
       'init': () => runInitCommand(
             initCommand: command,
-            routeInitToMultiRegistry: routeInitToMultiRegistry,
             multiRegistry: multiRegistry,
-            installer: installer,
             defaultNamespace: config.effectiveDefaultNamespace,
           ),
       'theme': () => runThemeCommand(
@@ -227,13 +226,7 @@ Future<void> runCliBootstrap(List<String> arguments) async {
           ),
       'add': () => runAddCommand(
             addCommand: command,
-            routeAddToMultiRegistry: routeAddToMultiRegistry,
             multiRegistry: multiRegistry,
-            installer: installer,
-            targetDir: targetDir,
-            logger: logger,
-            config: config,
-            preloadedNamespace: preloadedSelection?.namespace,
           ),
       'dry-run': () => runDryRunCommand(
             dryRunCommand: command,

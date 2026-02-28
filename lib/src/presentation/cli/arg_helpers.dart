@@ -20,14 +20,13 @@ bool hasConfiguredRegistryMap(ShadcnConfig config) {
   return false;
 }
 
-bool isLegacyNamespaceAliasAllowed(String namespace, ShadcnConfig config) {
+bool isDefaultNamespaceAliasAllowed(String namespace, ShadcnConfig config) {
   final trimmed = namespace.trim();
   if (trimmed.isEmpty) {
     return false;
   }
   final defaultNamespace = config.effectiveDefaultNamespace;
-  return trimmed == defaultNamespace ||
-      trimmed == ShadcnConfig.legacyDefaultNamespace;
+  return trimmed == defaultNamespace || trimmed == 'shadcn';
 }
 
 Set<String> parseFileKindOptions(

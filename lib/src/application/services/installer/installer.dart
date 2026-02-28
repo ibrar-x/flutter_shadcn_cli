@@ -70,7 +70,7 @@ class Installer {
     this.registryNamespace,
     this.includeFileKindsOverride,
     this.excludeFileKindsOverride,
-    this.enableLegacyCoreBootstrap = true,
+    this.enableLegacyCoreBootstrap = false,
     this.enableSharedGroups = true,
     this.enableComposites = true,
   }) : logger = logger ?? CliLogger();

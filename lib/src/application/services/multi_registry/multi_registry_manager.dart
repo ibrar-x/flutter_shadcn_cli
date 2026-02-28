@@ -1,5 +1,8 @@
-import 'package:flutter_shadcn_cli/src/application/services/multi_registry_types.dart';
 import 'package:flutter_shadcn_cli/src/application/services/add_resolution_service.dart';
+import 'package:flutter_shadcn_cli/src/application/dto/add_request.dart';
+import 'package:flutter_shadcn_cli/src/application/dto/qualified_component_ref.dart';
+import 'package:flutter_shadcn_cli/src/application/dto/registry_summary.dart';
+import 'package:flutter_shadcn_cli/src/application/services/registry_source.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
 import 'package:flutter_shadcn_cli/src/core/utils/path_utils.dart';
 import 'package:flutter_shadcn_cli/src/init_action_engine.dart';
@@ -12,7 +15,6 @@ import 'package:flutter_shadcn_cli/src/registry_directory.dart';
 import 'package:flutter_shadcn_cli/src/state.dart';
 import 'package:flutter_shadcn_cli/src/version_manager.dart';
 
-export 'package:flutter_shadcn_cli/src/multi_registry_exception.dart';
 
 part 'multi_registry_init_part.dart';
 part 'multi_registry_add_part.dart';

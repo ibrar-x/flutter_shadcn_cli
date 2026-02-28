@@ -71,7 +71,7 @@ Future<int> runRemoveCommand({
     final namespace = parsed?.namespace ?? currentNamespace;
     if (parsed != null &&
         namespace != selectedNamespace &&
-        !isLegacyNamespaceAliasAllowed(parsed.namespace, config)) {
+        !isDefaultNamespaceAliasAllowed(parsed.namespace, config)) {
       stderr.writeln(
         'Error: remove with @namespace/component requires --registry-name for that namespace.',
       );

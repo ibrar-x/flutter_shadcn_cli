@@ -1,4 +1,5 @@
-import 'package:flutter_shadcn_cli/src/application/services/multi_registry_types.dart';
+import 'package:flutter_shadcn_cli/src/application/dto/add_request.dart';
+import 'package:flutter_shadcn_cli/src/application/dto/qualified_component_ref.dart';
 import 'package:flutter_shadcn_cli/src/config.dart';
 
 typedef ComponentExistsInNamespace = Future<bool> Function(
@@ -54,12 +55,10 @@ class AddResolutionService {
         .where((entry) => entry.value.enabled)
         .map((entry) => entry.key)
         .toSet();
-    if (enabled.isEmpty &&
-        config.registries != null &&
-        config.registries!.isNotEmpty) {
-      enabled.add(config.effectiveDefaultNamespace);
-    }
     final defaultNamespace = config.effectiveDefaultNamespace;
+    if (enabled.isEmpty) {
+      enabled.add(defaultNamespace);
+    }
 
     for (final token in requested) {
       final qualified = parseQualifiedComponentRef(token);

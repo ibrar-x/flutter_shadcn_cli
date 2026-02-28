@@ -1,4 +1,5 @@
 import 'package:flutter_shadcn_cli/src/index_loader.dart';
+import 'package:flutter_shadcn_cli/src/index/index_component.dart';
 import 'package:flutter_shadcn_cli/src/exit_codes.dart';
 import 'package:flutter_shadcn_cli/src/json_output.dart';
 import 'package:flutter_shadcn_cli/src/logger.dart';

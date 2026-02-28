@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:path/path.dart' as p;
 import 'package:flutter_shadcn_cli/src/logger.dart';
 import 'package:flutter_shadcn_cli/src/skills_loader.dart';
+import 'package:flutter_shadcn_cli/src/skills/skill_entry.dart';
 
 /// AI model folder to display name mapping.
 const Map<String, String> aiModelDisplayNames = {

@@ -54,11 +54,9 @@ RegistrySelection resolveRegistrySelection(
 }) {
   final selectedNamespace = namespaceOverride ??
       (args?['registry-name'] as String?)?.trim() ??
-      (config.hasRegistries ? config.effectiveDefaultNamespace : null);
-  final selectedEntry =
-      selectedNamespace == null ? null : config.registryConfig(selectedNamespace);
-  if (selectedNamespace != null &&
-      selectedEntry == null &&
+      config.effectiveDefaultNamespace;
+  final selectedEntry = config.registryConfig(selectedNamespace);
+  if (selectedEntry == null &&
       ((args?['registry-name'] as String?)?.trim().isNotEmpty == true ||
           config.hasRegistries)) {
     stderr.writeln('Error: Registry namespace "$selectedNamespace" not found.');

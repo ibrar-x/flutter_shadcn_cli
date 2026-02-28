@@ -9,7 +9,6 @@ import 'package:flutter_shadcn_cli/src/presentation/cli/registry_bootstrap_selec
 import 'package:flutter_shadcn_cli/src/presentation/cli/registry_selection.dart';
 import 'package:flutter_shadcn_cli/src/presentation/cli/runtime_roots.dart';
 
-export 'package:flutter_shadcn_cli/src/presentation/cli/registry_bootstrap_exception.dart';
 
 Future<BootstrapRouteDecision> resolveBootstrapRouteDecision({
   required ArgResults argResults,
@@ -21,50 +20,13 @@ Future<BootstrapRouteDecision> resolveBootstrapRouteDecision({
   var routeInitToMultiRegistry = false;
   var routeAddToMultiRegistry = false;
   final activeCommand = argResults.command;
-  final hasRegistriesUrlOverride = registriesUrl?.isNotEmpty == true;
-  final hasRegistriesPathOverride = registriesPath?.isNotEmpty == true;
 
   if (activeCommand != null && activeCommand.name == 'init') {
-    final initRest = activeCommand.rest;
-    final initAll = activeCommand['all'] == true;
-    final explicitLegacySelection =
-        hasExplicitLegacyRegistrySelection(argResults);
-    if (!initAll && initRest.length == 1) {
-      try {
-        final namespaceCandidate = parseInitNamespaceToken(initRest.first);
-        routeInitToMultiRegistry =
-            await multiRegistry.canHandleNamespaceInit(namespaceCandidate);
-      } catch (_) {
-        routeInitToMultiRegistry = false;
-      }
-    } else if (!initAll &&
-        initRest.isEmpty &&
-        !explicitLegacySelection &&
-        (config.hasRegistries ||
-            hasRegistriesUrlOverride ||
-            hasRegistriesPathOverride)) {
-      try {
-        final namespaceCandidate = config.effectiveDefaultNamespace;
-        routeInitToMultiRegistry =
-            await multiRegistry.canHandleNamespaceInit(namespaceCandidate);
-      } catch (_) {
-        routeInitToMultiRegistry = false;
-      }
-    }
+    routeInitToMultiRegistry = true;
   }
 
   if (activeCommand != null && activeCommand.name == 'add') {
-    final addRest = activeCommand.rest;
-    final addAll = activeCommand['all'] == true || addRest.contains('all');
-    if (!addAll && addRest.isNotEmpty) {
-      final hasConfiguredMap = hasConfiguredRegistryMap(config);
-      final enabledCount =
-          (config.registries ?? const <String, RegistryConfigEntry>{})
-              .entries
-              .where((entry) => entry.value.enabled)
-              .length;
-      routeAddToMultiRegistry = enabledCount > 1 || hasConfiguredMap;
-    }
+    routeAddToMultiRegistry = true;
   }
 
   return BootstrapRouteDecision(
